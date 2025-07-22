@@ -1,0 +1,3 @@
+.venv/
+GOOGLE_APPLICATION_CREDENTIALS.json
+.env

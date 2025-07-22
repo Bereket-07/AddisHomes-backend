@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-telegram-bot[job-queue]
+google-cloud-firestore
+python-dotenv
