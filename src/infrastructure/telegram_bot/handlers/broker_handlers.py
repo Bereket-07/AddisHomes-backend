@@ -10,24 +10,26 @@ from src.utils.i18n import t
 from src.utils.constants import *
 from .common_handlers import ensure_user_data
 from src.utils.display_utils import create_property_card_text # <<< IMPORTED UTILITY
+from .common_handlers import ensure_user_data, handle_exceptions
 
 logger = logging.getLogger(__name__)
 
 # --- Property Submission Conversation ---
 
+@handle_exceptions
 @ensure_user_data
 async def start_submission(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['submission_data'] = {}
     await update.message.reply_text("Let's submit a new property. First, what type is it?", reply_markup=keyboards.get_property_type_keyboard())
     return STATE_SUBMIT_PROP_TYPE
-
+@handle_exceptions
 async def receive_property_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['submission_data']['property_type'] = PropertyType(update.message.text)
     # For now, we assume Addis Ababa. This could be a question itself.
     context.user_data['submission_data']['location'] = {'region': 'Addis Ababa', 'city': 'Addis Ababa'}
     await update.message.reply_text("In which Sub-city is the property located?", reply_markup=keyboards.get_sub_city_keyboard())
     return STATE_SUBMIT_LOCATION_SUB_CITY
-
+@handle_exceptions
 async def receive_sub_city(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     sub_city = update.message.text
     context.user_data['submission_data']['location']['sub_city'] = sub_city
@@ -46,12 +48,12 @@ async def receive_sub_city(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     await update.message.reply_text(prompt, reply_markup=keyboard)
     return STATE_SUBMIT_SPECIFIC_AREA
-
+@handle_exceptions
 async def receive_specific_area(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['submission_data']['location']['specific_area'] = update.message.text
     await update.message.reply_text("How many bedrooms?", reply_markup=keyboards.get_numeric_keyboard(keyboards.BEDROOM_OPTIONS))
     return STATE_SUBMIT_BEDROOMS
-
+@handle_exceptions
 async def receive_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         # The split(' ')[0] handles cases like "0 (Ground)" to only get "0"
@@ -63,7 +65,7 @@ async def receive_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         # This will now only catch truly invalid numbers, not "Cancel"
         await update.message.reply_text("That's not a valid number. Please use the buttons.")
         return STATE_SUBMIT_BEDROOMS
-
+@handle_exceptions
 async def receive_bathrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         cleaned_text = update.message.text.replace('+', '')
@@ -73,13 +75,13 @@ async def receive_bathrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except (ValueError, TypeError):
         await update.message.reply_text("That's not a valid number. Please use the buttons.")
         return STATE_SUBMIT_BATHROOMS
-
+@handle_exceptions
 async def receive_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     size_range = keyboards.SIZE_RANGES_TEXT[update.message.text].split('-')
     context.user_data['submission_data']['size_sqm'] = (int(size_range[0]) + int(size_range[1])) / 2
     await update.message.reply_text("What is the Floor Level? (Type the number, e.g., 5)", reply_markup=keyboards.REMOVE_KEYBOARD)
     return STATE_SUBMIT_FLOOR_LEVEL
-
+@handle_exceptions
 async def receive_floor_level(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         cleaned_text = update.message.text.split(' ')[0].replace('+', '')
@@ -89,17 +91,17 @@ async def receive_floor_level(update: Update, context: ContextTypes.DEFAULT_TYPE
     except (ValueError, TypeError):
         await update.message.reply_text("That's not a valid number. Please use the buttons.")
         return STATE_SUBMIT_FLOOR_LEVEL
-
+@handle_exceptions
 async def receive_furnishing_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['submission_data']['furnishing_status'] = FurnishingStatus(update.message.text)
     await update.message.reply_text("Does it have a Title Deed?", reply_markup=keyboards.get_boolean_keyboard())
     return STATE_SUBMIT_TITLE_DEED
-
+@handle_exceptions
 async def receive_title_deed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['submission_data']['title_deed'] = (update.message.text.lower() == "yes")
     await update.message.reply_text("How many Parking Spaces? (Type the number, e.g., 2)", reply_markup=keyboards.REMOVE_KEYBOARD)
     return STATE_SUBMIT_PARKING_SPACES
-
+@handle_exceptions
 async def receive_parking_spaces(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         cleaned_text = update.message.text.replace('+', '')
@@ -115,12 +117,12 @@ async def receive_parking_spaces(update: Update, context: ContextTypes.DEFAULT_T
     except (ValueError, TypeError):
         await update.message.reply_text("That's not a valid number. Please use the buttons.")
         return STATE_SUBMIT_PARKING_SPACES
-
+@handle_exceptions
 async def receive_condo_scheme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['submission_data']['condominium_scheme'] = CondoScheme(update.message.text)
     await update.message.reply_text("Please type the exact price in ETB.", reply_markup=keyboards.REMOVE_KEYBOARD)
     return STATE_SUBMIT_PRICE
-
+@handle_exceptions
 async def receive_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         context.user_data['submission_data']['price_etb'] = float(update.message.text)
@@ -130,7 +132,7 @@ async def receive_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     except (ValueError, TypeError):
         await update.message.reply_text("Please enter a valid number for the price.")
         return STATE_SUBMIT_PRICE
-
+@handle_exceptions
 async def receive_images(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not update.message.photo:
         await update.message.reply_text("That's not an image. Please send photos or click the 'Done' button.")
@@ -138,7 +140,7 @@ async def receive_images(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     context.user_data['submission_data']['image_urls'].append(update.message.photo[-1].file_id)
     await update.message.reply_text(f"Image {len(context.user_data['submission_data']['image_urls'])} received. Send more or click 'Done Uploading'.")
     return STATE_SUBMIT_IMAGES
-
+@handle_exceptions
 async def done_receiving_images(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     images = context.user_data.get('submission_data', {}).get('image_urls', [])
     if len(images) < 3:
@@ -146,7 +148,7 @@ async def done_receiving_images(update: Update, context: ContextTypes.DEFAULT_TY
         return STATE_SUBMIT_IMAGES
     await update.message.reply_text("Great! Finally, please enter a short description for the property.", reply_markup=keyboards.REMOVE_KEYBOARD)
     return STATE_SUBMIT_DESCRIPTION
-
+@handle_exceptions
 async def receive_description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['submission_data']['description'] = update.message.text
     user: User = context.user_data['user']
@@ -166,8 +168,8 @@ async def receive_description(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     context.user_data.pop('submission_data', None)
     return ConversationHandler.END
-
-# --- "My Listings" Handler (UPDATED) ---
+# --- "My Listings" Handler (UPDATED) ---    
+@handle_exceptions
 @ensure_user_data
 async def my_listings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Displays the broker's own listings using the rich card format."""

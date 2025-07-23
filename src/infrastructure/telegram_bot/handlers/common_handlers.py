@@ -1,14 +1,69 @@
+# src/infrastructure/telegram_bot/handlers/common_handlers.py
+
 from telegram import Update
 from functools import wraps
 import logging
 from telegram.ext import ContextTypes, ConversationHandler
+from telegram.error import TelegramError
 from src.use_cases.user_use_cases import UserUseCases
 from src.domain.models.user_models import UserRole
 from .. import keyboards
 from src.utils.i18n import t
+from src.utils.exceptions import RealEstatePlatformException, TelegramApiError
 
 logger = logging.getLogger(__name__)
 
+
+def handle_exceptions(func):
+    """
+    A decorator that wraps handler functions to catch and handle exceptions gracefully.
+    It logs the error, notifies the user, and returns them to the main menu.
+    """
+    @wraps(func)
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        try:
+            # Try to execute the actual handler function
+            return await func(update, context, *args, **kwargs)
+        
+        except RealEstatePlatformException as e:
+            # Handle our custom application exceptions
+            logger.error(f"Custom exception in handler '{func.__name__}': {e}", exc_info=True)
+            user_message = f"⚠️ Error: {e.message}"
+            await _send_error_response(update, context, user_message)
+            return ConversationHandler.END
+
+        except TelegramError as e:
+            # Handle errors from the Telegram API itself
+            logger.error(f"Telegram API error in handler '{func.__name__}': {e}", exc_info=True)
+            custom_error = TelegramApiError(message=f"A Telegram error occurred: {e.message}")
+            await _send_error_response(update, context, custom_error.message)
+            return ConversationHandler.END
+
+        except Exception as e:
+            # Handle any other unexpected exceptions
+            logger.critical(f"UNHANDLED exception in handler '{func.__name__}': {e}", exc_info=True)
+            user_message = "An unexpected error occurred. Our team has been notified. Please try again later."
+            await _send_error_response(update, context, user_message)
+            return ConversationHandler.END
+            
+    return wrapper
+
+async def _send_error_response(update: Update, context: ContextTypes.DEFAULT_TYPE, message: str):
+    """Helper function to send a formatted error message and return to main menu."""
+    # Clear any lingering conversation data
+    context.user_data.pop('submission_data', None)
+    context.user_data.pop('filters', None)
+    context.user_data.pop('prop_to_reject', None)
+    
+    user = context.user_data.get('user')
+    main_menu_keyboard = keyboards.get_main_menu_keyboard(user) if user else keyboards.get_role_selection_keyboard()
+
+    if update.effective_chat:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=message,
+            reply_markup=main_menu_keyboard
+        )
 
 def ensure_user_data(func):
     """
@@ -18,7 +73,6 @@ def ensure_user_data(func):
     """
     @wraps(func)
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        # We need to check for the user in the context before every decorated function
         if 'user' not in context.user_data:
             logger.info(f"User object not in context for handler '{func.__name__}'. Refetching from DB.")
             user_use_cases: UserUseCases = context.bot_data["user_use_cases"]
@@ -26,34 +80,29 @@ def ensure_user_data(func):
 
             if not effective_user:
                 logger.warning("Could not find effective_user in update. Cannot refetch user.")
-                # Decide how to handle this case, e.g., by ending the conversation or sending an error message.
-                # For now, we'll just return, as no further action can be taken without a user.
                 return
 
             user = await user_use_cases.get_or_create_user_by_telegram_id(
                 telegram_id=effective_user.id,
                 display_name=effective_user.full_name
             )
-            # If a user is found or created, add it to the context
             if user:
                 context.user_data['user'] = user
             else:
-                # This case is unlikely but good to handle
                 logger.error(f"Failed to get or create user for telegram_id {effective_user.id}")
                 await update.message.reply_text("An error occurred while retrieving your profile. Please try typing /start again.")
                 return ConversationHandler.END
 
-        # Now that we're sure the user exists in context, run the original function
         return await func(update, context, *args, **kwargs)
 
     return wrapper
 
 
+@handle_exceptions
 @ensure_user_data
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
-    Handles the /start command. The decorator ensures user data is loaded,
-    though this function also has its own loading logic as the primary entry point.
+    Handles the /start command. The decorator ensures user data is loaded.
     """
     user = context.user_data['user']
     
@@ -67,9 +116,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             t('main_menu_prompt'),
             reply_markup=keyboards.get_main_menu_keyboard(user)
         )
-    return ConversationHandler.END # End conversation to allow new commands
+    return ConversationHandler.END
 
 
+@handle_exceptions
 @ensure_user_data
 async def set_user_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the role selection from the first-time menu."""
@@ -88,6 +138,7 @@ async def set_user_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+@handle_exceptions
 @ensure_user_data
 async def back_to_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the 'Back to Main Menu' button click, safely."""
@@ -99,13 +150,13 @@ async def back_to_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+@handle_exceptions
 @ensure_user_data
 async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancels any ongoing conversation, safely."""
-    # Clear any temporary data from conversations
     context.user_data.pop('submission_data', None)
     context.user_data.pop('filters', None)
-    context.user_data.pop('prop_to_reject', None) # Also clear this for safety
+    context.user_data.pop('prop_to_reject', None)
 
     user = context.user_data['user']
     await update.message.reply_text(

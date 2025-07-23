@@ -1,12 +1,16 @@
+# src/app/main.py
+
 import asyncio
 import logging
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from src.utils.config import settings
 from src.controllers import property_controller, auth_controller
 from src.infrastructure.telegram_bot.bot import setup_bot_application
 from src.app.startup import user_use_cases, property_use_cases
+from src.utils.exceptions import RealEstatePlatformException, NotFoundError # <<< IMPORT
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +19,21 @@ app = FastAPI(
     description="Backend for the Ethiopian Real Estate Platform, serving a web app and Telegram bot.",
     version="1.0.0"
 )
+
+# --- NEW: Centralized FastAPI Exception Handler ---
+@app.exception_handler(RealEstatePlatformException)
+async def custom_app_exception_handler(request: Request, exc: RealEstatePlatformException):
+    logger.error(f"Application error occurred for request {request.url}: {exc.message}")
+    
+    status_code = 500 # Internal Server Error by default
+    if isinstance(exc, NotFoundError):
+        status_code = 404 # Not Found
+    # Add more mappings here for other exceptions like InvalidOperationError (400 Bad Request)
+    
+    return JSONResponse(
+        status_code=status_code,
+        content={"detail": exc.message},
+    )
 
 app.add_middleware(
     CORSMiddleware,
