@@ -1,0 +1,60 @@
+{
+  "city": "Addis Ababa",
+  "sub_cities": {
+    "Arada": {
+      "name_am": "አራዳ",
+      "neighborhoods": ["Piazza", "Arat Kilo", "Amist Kilo", "Sebara Babur"],
+      "condominium_sites": []
+    },
+    "Addis Ketema": {
+      "name_am": "አዲስ ከተማ",
+      "neighborhoods": ["Merkato", "Autobus Tera", "Sebategna"],
+      "condominium_sites": []
+    },
+    "Akaky Kaliti": {
+      "name_am": "አቃቂ ቃሊቲ",
+      "neighborhoods": ["Kaliti", "Akaky", "Tulu Dimtu"],
+      "condominium_sites": ["Tulu Dimtu Condominiums", "Kaliti Condominiums"]
+    },
+    "Bole": {
+      "name_am": "ቦሌ",
+      "neighborhoods": ["Bole Medhanealem", "Hayahulet (22)", "CMC / Ayat", "Gerji"],
+      "condominium_sites": ["Summit Condominiums", "Bole Bulbula Condominiums", "CMC (Century Mall Condominiums)", "Ayat Condominiums (Older Sites)", "Gerji (Imperial) Condominiums"]
+    },
+    "Gullele": {
+      "name_am": "ጉለሌ",
+      "neighborhoods": ["Shiro Meda", "Addisu Gebeya", "Kechene"],
+      "condominium_sites": ["Addisu Gebeya / Shegole Sites"]
+    },
+    "Kirkos": {
+      "name_am": "ቂርቆስ",
+      "neighborhoods": ["Meskel Square", "Kazanchis", "Gotera", "Lancha"],
+      "condominium_sites": ["Gotera Condominiums"]
+    },
+    "Kolfe Keranio": {
+      "name_am": "ኮልፌ ቀራኒዮ",
+      "neighborhoods": ["Alem Bank", "Asko", "Bethel"],
+      "condominium_sites": ["Kolfe Keranio Sites", "Bethel Condominiums", "Ayer Tena Condominiums"]
+    },
+    "Lideta": {
+      "name_am": "ልደታ",
+      "neighborhoods": ["Lideta", "Geja Sefer", "Abnet"],
+      "condominium_sites": []
+    },
+    "Nifas Silk-Lafto": {
+      "name_am": "ንፋስ ስልክ-ላፍቶ",
+      "neighborhoods": ["Sarbet", "Mekanisa", "Jemo", "Lafto"],
+      "condominium_sites": ["Jemo Condominiums (1, 2, and 3)", "Mekanisa Condominiums (Gabriel)", "Lafto Condominiums", "Sarbet Condominiums"]
+    },
+    "Yeka": {
+      "name_am": "የካ",
+      "neighborhoods": ["Megenagna", "Shola", "Ferensay Legasion", "Yeka Abado"],
+      "condominium_sites": ["Yeka Abado Condominiums", "Megenagna Condominiums (40/60)", "Ferensay Legasion Sites"]
+    },
+    "Lemi Kura": {
+      "name_am": "ለሚ ኩራ",
+      "neighborhoods": ["Koye Feche", "Lemi Town", "Ayat Zone"],
+      "condominium_sites": ["Koye Feche Condominiums", "Ayat (Zone 5, etc.) / Ayat 2"]
+    }
+  }
+}

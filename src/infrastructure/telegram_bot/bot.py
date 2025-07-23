@@ -19,31 +19,25 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     application.bot_data["property_use_cases"] = prop_cases
 
     # --- CONVERSATION HANDLER DEFINITIONS ---
-
-    # 1. Broker: Property Submission Flow (NOW EXPANDED)
+ # 1. Broker: Property Submission Flow
     submission_conv = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex(f"^{t('submit_property')}$"), broker_handlers.start_submission)],
         states={
             STATE_SUBMIT_PROP_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_property_type)],
+            STATE_SUBMIT_LOCATION_SUB_CITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_sub_city)],
+            STATE_SUBMIT_SPECIFIC_AREA: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_specific_area)],
             STATE_SUBMIT_BEDROOMS: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_bedrooms)],
             STATE_SUBMIT_BATHROOMS: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_bathrooms)],
             STATE_SUBMIT_SIZE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_size)],
-            
-            # --- NEW STATES ---
-            STATE_SUBMIT_LOCATION_REGION: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_location_region)],
-            STATE_SUBMIT_LOCATION_CITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_location_city)],
-            STATE_SUBMIT_LOCATION_SUB_CITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_location_sub_city)],
             STATE_SUBMIT_FLOOR_LEVEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_floor_level)],
             STATE_SUBMIT_FURNISHING_STATUS: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_furnishing_status)],
             STATE_SUBMIT_TITLE_DEED: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_title_deed)],
             STATE_SUBMIT_PARKING_SPACES: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_parking_spaces)],
             STATE_SUBMIT_CONDO_SCHEME: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_condo_scheme)],
-            # --- END NEW STATES ---
-
             STATE_SUBMIT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_price)],
             STATE_SUBMIT_IMAGES: [
                 MessageHandler(filters.PHOTO, broker_handlers.receive_images),
-                MessageHandler(filters.Regex(DONE_UPLOADING), broker_handlers.done_receiving_images),
+                MessageHandler(filters.Text([DONE_UPLOADING_TEXT]), broker_handlers.done_receiving_images),
             ],
             STATE_SUBMIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_description)],
         },

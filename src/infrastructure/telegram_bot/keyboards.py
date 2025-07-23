@@ -2,7 +2,9 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
 from src.domain.models.user_models import User, UserRole
 from src.domain.models.property_models import PropertyType, CondoScheme , FurnishingStatus
 from src.utils.i18n import t
-from src.utils.constants import ANY_OPTION, ANY_PRICE, ANY_REGION, ANY_SCHEME, CB_ADMIN_APPROVE, CB_ADMIN_REJECT
+from src.utils.constants import *
+from src.utils.data_loader import location_data # Import our data loader
+
 
 # A constant to remove the reply keyboard
 REMOVE_KEYBOARD = ReplyKeyboardRemove()
@@ -59,8 +61,23 @@ def get_role_selection_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
 
 # --- Submission & Filter Flow Keyboards ---
 def get_property_type_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
-    options = [pt.value for pt in PropertyType]
-    return create_reply_options_keyboard(options)
+    return create_reply_options_keyboard([pt.value for pt in PropertyType])
+
+def get_sub_city_keyboard() -> ReplyKeyboardMarkup:
+    """Creates a dynamic keyboard for Addis Ababa sub-cities."""
+    return create_reply_options_keyboard(location_data.get_addis_sub_cities(), columns=2)
+
+def get_neighborhood_keyboard(sub_city: str) -> ReplyKeyboardMarkup:
+    """Creates a dynamic keyboard of neighborhoods for a given sub-city."""
+    return create_reply_options_keyboard(location_data.get_neighborhoods_for_sub_city(sub_city), columns=2)
+
+def get_condo_site_keyboard(sub_city: str) -> ReplyKeyboardMarkup:
+    """Creates a dynamic keyboard of condominium sites for a given sub-city."""
+    return create_reply_options_keyboard(location_data.get_condo_sites_for_sub_city(sub_city), columns=1)
+
+def get_numeric_keyboard(options: list) -> ReplyKeyboardMarkup:
+    """Helper for numeric choice keyboards like bedrooms/bathrooms."""
+    return create_reply_options_keyboard(options, columns=4)
 
 def get_bedroom_keyboard(is_filter: bool = False, lang: str = 'en') -> ReplyKeyboardMarkup:
     options = BEDROOM_OPTIONS
@@ -89,14 +106,23 @@ def get_condo_scheme_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
     options = CONDO_SCHEMES + [ANY_SCHEME]
     return create_reply_options_keyboard(options)
 
-def get_furnishing_status_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup: # <<< NEW FUNCTION
-    """Creates a keyboard for furnishing status options."""
-    options = [fs.value for fs in FurnishingStatus]
-    return create_reply_options_keyboard(options, columns=3)
+def get_furnishing_status_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
+    return create_reply_options_keyboard([fs.value for fs in FurnishingStatus], columns=3)
 
 def get_boolean_keyboard(yes_text="Yes", no_text="No", lang: str = 'en') -> ReplyKeyboardMarkup: # <<< NEW FUNCTION
     """Creates a simple Yes/No keyboard."""
     return create_reply_options_keyboard([yes_text, no_text], columns=2)
+
+def get_condo_scheme_keyboard(is_filter: bool = False) -> ReplyKeyboardMarkup:
+    options = CONDO_SCHEMES
+    if is_filter:
+        options = options + [ANY_SCHEME]
+    return create_reply_options_keyboard(options)
+
+def get_image_upload_keyboard() -> ReplyKeyboardMarkup:
+    """Creates a keyboard with a 'Done' button for image uploads."""
+    keyboard = [[KeyboardButton(DONE_UPLOADING_TEXT)], [KeyboardButton(t('cancel'))]]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 # --- Inline Keyboard for Admin Actions ---
 def create_admin_approval_keyboard(prop_id: str, lang: str = 'en') -> InlineKeyboardMarkup:
