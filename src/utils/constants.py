@@ -28,6 +28,10 @@ ANY_REGION = "Any Region"
 ANY_SCHEME = "Any Scheme"
 DONE_UPLOADING_TEXT = "✅ Done Uploading" # For the button
 
+
+# --- NEW: Regex for numeric button choices ---
+NUMERIC_CHOICE_REGEX = r"^\d+(\+)?( .*)?$" # Matches "1", "6+", "0 (Ground)"
+
 # --- Conversation States ---
 (
     STATE_MAIN,

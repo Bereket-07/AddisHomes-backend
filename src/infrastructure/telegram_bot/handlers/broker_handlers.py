@@ -53,14 +53,26 @@ async def receive_specific_area(update: Update, context: ContextTypes.DEFAULT_TY
     return STATE_SUBMIT_BEDROOMS
 
 async def receive_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['submission_data']['bedrooms'] = int(update.message.text.replace('+', ''))
-    await update.message.reply_text("How many bathrooms?", reply_markup=keyboards.get_numeric_keyboard(keyboards.BATHROOM_OPTIONS))
-    return STATE_SUBMIT_BATHROOMS
+    try:
+        # The split(' ')[0] handles cases like "0 (Ground)" to only get "0"
+        cleaned_text = update.message.text.split(' ')[0].replace('+', '')
+        context.user_data['submission_data']['bedrooms'] = int(cleaned_text)
+        await update.message.reply_text("How many bathrooms?", reply_markup=keyboards.get_numeric_keyboard(keyboards.BATHROOM_OPTIONS))
+        return STATE_SUBMIT_BATHROOMS
+    except (ValueError, TypeError):
+        # This will now only catch truly invalid numbers, not "Cancel"
+        await update.message.reply_text("That's not a valid number. Please use the buttons.")
+        return STATE_SUBMIT_BEDROOMS
 
 async def receive_bathrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['submission_data']['bathrooms'] = int(update.message.text.replace('+', ''))
-    await update.message.reply_text("What is the approximate size?", reply_markup=keyboards.get_size_range_keyboard())
-    return STATE_SUBMIT_SIZE
+    try:
+        cleaned_text = update.message.text.replace('+', '')
+        context.user_data['submission_data']['bathrooms'] = int(cleaned_text)
+        await update.message.reply_text("What is the approximate size?", reply_markup=keyboards.get_size_range_keyboard())
+        return STATE_SUBMIT_SIZE
+    except (ValueError, TypeError):
+        await update.message.reply_text("That's not a valid number. Please use the buttons.")
+        return STATE_SUBMIT_BATHROOMS
 
 async def receive_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     size_range = keyboards.SIZE_RANGES_TEXT[update.message.text].split('-')
@@ -69,9 +81,14 @@ async def receive_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     return STATE_SUBMIT_FLOOR_LEVEL
 
 async def receive_floor_level(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['submission_data']['floor_level'] = int(update.message.text)
-    await update.message.reply_text("What is the Furnishing Status?", reply_markup=keyboards.get_furnishing_status_keyboard())
-    return STATE_SUBMIT_FURNISHING_STATUS
+    try:
+        cleaned_text = update.message.text.split(' ')[0].replace('+', '')
+        context.user_data['submission_data']['floor_level'] = int(cleaned_text)
+        await update.message.reply_text("What is the Furnishing Status?", reply_markup=keyboards.get_furnishing_status_keyboard())
+        return STATE_SUBMIT_FURNISHING_STATUS
+    except (ValueError, TypeError):
+        await update.message.reply_text("That's not a valid number. Please use the buttons.")
+        return STATE_SUBMIT_FLOOR_LEVEL
 
 async def receive_furnishing_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['submission_data']['furnishing_status'] = FurnishingStatus(update.message.text)
@@ -84,14 +101,20 @@ async def receive_title_deed(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return STATE_SUBMIT_PARKING_SPACES
 
 async def receive_parking_spaces(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['submission_data']['parking_spaces'] = int(update.message.text)
-    prop_type = context.user_data['submission_data']['property_type']
-    if prop_type == PropertyType.CONDOMINIUM:
-        await update.message.reply_text("What is the Condominium Scheme Type?", reply_markup=keyboards.get_condo_scheme_keyboard())
-        return STATE_SUBMIT_CONDO_SCHEME
-    else:
-        await update.message.reply_text("Please type the exact price in ETB.", reply_markup=keyboards.REMOVE_KEYBOARD)
-        return STATE_SUBMIT_PRICE
+    try:
+        cleaned_text = update.message.text.replace('+', '')
+        context.user_data['submission_data']['parking_spaces'] = int(cleaned_text)
+        
+        prop_type = context.user_data['submission_data']['property_type']
+        if prop_type == PropertyType.CONDOMINIUM:
+            await update.message.reply_text("What is the Condominium Scheme Type?", reply_markup=keyboards.get_condo_scheme_keyboard())
+            return STATE_SUBMIT_CONDO_SCHEME
+        else:
+            await update.message.reply_text("Please type the exact price in ETB.", reply_markup=keyboards.REMOVE_KEYBOARD)
+            return STATE_SUBMIT_PRICE
+    except (ValueError, TypeError):
+        await update.message.reply_text("That's not a valid number. Please use the buttons.")
+        return STATE_SUBMIT_PARKING_SPACES
 
 async def receive_condo_scheme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['submission_data']['condominium_scheme'] = CondoScheme(update.message.text)

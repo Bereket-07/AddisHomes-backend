@@ -13,6 +13,8 @@ REMOVE_KEYBOARD = ReplyKeyboardRemove()
 BEDROOM_OPTIONS = ["1", "2", "3", "4", "5", "6+"]
 BATHROOM_OPTIONS = ["1", "2", "3", "4+"]
 REGIONS = ["Addis Ababa", "Amhara", "Oromia", "Other"]
+FLOOR_LEVEL_OPTIONS = ["0 (Ground)", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10+"]
+PARKING_SPACES_OPTIONS = ["0", "1", "2", "3", "4+"]
 CONDO_SCHEMES = [cs.value for cs in CondoScheme]
 
 # --- FIX: Added the missing size ranges ---

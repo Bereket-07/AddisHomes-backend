@@ -7,9 +7,11 @@ from .. import keyboards
 from src.utils.i18n import t
 from src.utils.constants import *
 from src.utils.display_utils import create_property_card_text # <<< IMPORTED UTILITY
+from .common_handlers import ensure_user_data
 
 logger = logging.getLogger(__name__)
 
+@ensure_user_data
 async def show_properties(update: Update, context: ContextTypes.DEFAULT_TYPE, filters: PropertyFilter):
     """A helper function to fetch and display properties using rich cards."""
     source_message = update.message or update.callback_query.message
@@ -141,6 +143,7 @@ async def receive_filter_condo_scheme(update: Update, context: ContextTypes.DEFA
     context.user_data.pop('filters', None)
     return ConversationHandler.END
 
+@ensure_user_data
 async def browse_all_properties(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler for browsing all properties without filters."""
     await show_properties(update, context, PropertyFilter())
