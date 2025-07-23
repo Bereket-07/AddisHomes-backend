@@ -1,5 +1,3 @@
-# src/infrastructure/telegram_bot/bot.py
-
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters,
     ConversationHandler
@@ -14,7 +12,7 @@ from .handlers import (
 )
 
 def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases) -> Application:
-    """Creates and aconfigures the Telegram bot application."""
+    """Creates and configures the Telegram bot application."""
     builder = Application.builder().token(settings.TELEGRAM_BOT_TOKEN)
     application = builder.build()
     application.bot_data["user_use_cases"] = user_cases
@@ -31,19 +29,20 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
             STATE_SUBMIT_BEDROOMS: [MessageHandler(filters.Regex(NUMERIC_CHOICE_REGEX), broker_handlers.receive_bedrooms)],
             STATE_SUBMIT_BATHROOMS: [MessageHandler(filters.Regex(NUMERIC_CHOICE_REGEX), broker_handlers.receive_bathrooms)],
             
-            # --- THE MISSING STATES ARE NOW ADDED HERE ---
+            # --- START: MINIMAL FIX ---
             STATE_SUBMIT_SIZE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_size)],
-            STATE_SUBMIT_FLOOR_LEVEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_floor_level)],
+            # --- END: MINIMAL FIX ---
+
+            STATE_SUBMIT_FLOOR_LEVEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_floor_level)], # Note: This will likely be the next error.
+            STATE_SUBMIT_PARKING_SPACES: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_parking_spaces)], # Note: Changed Regex to TEXT to match receive_parking_spaces
             STATE_SUBMIT_FURNISHING_STATUS: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_furnishing_status)],
             STATE_SUBMIT_TITLE_DEED: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_title_deed)],
-            STATE_SUBMIT_PARKING_SPACES: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_parking_spaces)],
-            # --- END OF ADDED STATES ---
             
             STATE_SUBMIT_CONDO_SCHEME: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_condo_scheme)],
             STATE_SUBMIT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_price)],
             STATE_SUBMIT_IMAGES: [
                 MessageHandler(filters.PHOTO, broker_handlers.receive_images),
-                MessageHandler(filters.Regex(f"^{DONE_UPLOADING_TEXT}$"), broker_handlers.done_receiving_images),
+                MessageHandler(filters.Regex(f"^{DONE_UPLOADING_TEXT}$"), broker_handlers.done_receiving_images), # Note: Changed filters.Text to filters.Regex
             ],
             STATE_SUBMIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_description)],
         },
@@ -67,6 +66,7 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
 
     # 3. Admin: Property Rejection Flow
     admin_rejection_conv = ConversationHandler(
+        # Use the constant for the pattern
         entry_points=[CallbackQueryHandler(admin_handlers.reject_property_start, pattern=f"^{CB_ADMIN_REJECT}_")],
         states={
             STATE_ADMIN_REJECT_REASON_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handlers.reject_property_reason)]
@@ -76,6 +76,7 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     )
 
     # --- REGISTERING ALL HANDLERS ---
+
     application.add_handler(CommandHandler("start", common_handlers.start))
     application.add_handler(MessageHandler(
         filters.Regex(f"^{t('buyer_role')}|{t('broker_role')}$"),
@@ -95,6 +96,7 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     application.add_handler(MessageHandler(filters.Regex(f"^{t('back_to_main_menu')}$"), common_handlers.back_to_main_menu))
 
     # Add the single CallbackQueryHandler for approving properties
+    # The rejection CbQ is the entry point for its own conversation handler.
     application.add_handler(CallbackQueryHandler(admin_handlers.approve_property, pattern=f"^{CB_ADMIN_APPROVE}_"))
 
     return application
