@@ -1,6 +1,6 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from src.domain.models.user_models import User, UserRole
-from src.domain.models.property_models import PropertyType, CondoScheme
+from src.domain.models.property_models import PropertyType, CondoScheme , FurnishingStatus
 from src.utils.i18n import t
 from src.utils.constants import ANY_OPTION, ANY_PRICE, ANY_REGION, ANY_SCHEME, CB_ADMIN_APPROVE, CB_ADMIN_REJECT
 
@@ -88,6 +88,15 @@ def get_region_keyboard(is_filter: bool = False, lang: str = 'en') -> ReplyKeybo
 def get_condo_scheme_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
     options = CONDO_SCHEMES + [ANY_SCHEME]
     return create_reply_options_keyboard(options)
+
+def get_furnishing_status_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup: # <<< NEW FUNCTION
+    """Creates a keyboard for furnishing status options."""
+    options = [fs.value for fs in FurnishingStatus]
+    return create_reply_options_keyboard(options, columns=3)
+
+def get_boolean_keyboard(yes_text="Yes", no_text="No", lang: str = 'en') -> ReplyKeyboardMarkup: # <<< NEW FUNCTION
+    """Creates a simple Yes/No keyboard."""
+    return create_reply_options_keyboard([yes_text, no_text], columns=2)
 
 # --- Inline Keyboard for Admin Actions ---
 def create_admin_approval_keyboard(prop_id: str, lang: str = 'en') -> InlineKeyboardMarkup:

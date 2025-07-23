@@ -20,7 +20,7 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
 
     # --- CONVERSATION HANDLER DEFINITIONS ---
 
-    # 1. Broker: Property Submission Flow
+    # 1. Broker: Property Submission Flow (NOW EXPANDED)
     submission_conv = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex(f"^{t('submit_property')}$"), broker_handlers.start_submission)],
         states={
@@ -28,7 +28,18 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
             STATE_SUBMIT_BEDROOMS: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_bedrooms)],
             STATE_SUBMIT_BATHROOMS: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_bathrooms)],
             STATE_SUBMIT_SIZE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_size)],
+            
+            # --- NEW STATES ---
             STATE_SUBMIT_LOCATION_REGION: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_location_region)],
+            STATE_SUBMIT_LOCATION_CITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_location_city)],
+            STATE_SUBMIT_LOCATION_SUB_CITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_location_sub_city)],
+            STATE_SUBMIT_FLOOR_LEVEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_floor_level)],
+            STATE_SUBMIT_FURNISHING_STATUS: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_furnishing_status)],
+            STATE_SUBMIT_TITLE_DEED: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_title_deed)],
+            STATE_SUBMIT_PARKING_SPACES: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_parking_spaces)],
+            STATE_SUBMIT_CONDO_SCHEME: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_condo_scheme)],
+            # --- END NEW STATES ---
+
             STATE_SUBMIT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_price)],
             STATE_SUBMIT_IMAGES: [
                 MessageHandler(filters.PHOTO, broker_handlers.receive_images),

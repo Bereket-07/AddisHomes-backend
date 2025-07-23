@@ -6,11 +6,12 @@ from src.domain.models.property_models import PropertyFilter, PropertyType, Cond
 from .. import keyboards
 from src.utils.i18n import t
 from src.utils.constants import *
+from src.utils.display_utils import create_property_card_text # <<< IMPORTED UTILITY
 
 logger = logging.getLogger(__name__)
 
 async def show_properties(update: Update, context: ContextTypes.DEFAULT_TYPE, filters: PropertyFilter):
-    """A helper function to fetch and display properties based on filters."""
+    """A helper function to fetch and display properties using rich cards."""
     source_message = update.message or update.callback_query.message
     await source_message.reply_text("Searching for properties...", reply_markup=keyboards.REMOVE_KEYBOARD)
     
@@ -29,23 +30,31 @@ async def show_properties(update: Update, context: ContextTypes.DEFAULT_TYPE, fi
 
     await source_message.reply_text(f"Found {len(properties)} matching properties:")
 
-    for prop in properties[:5]:
-        prop_summary = (
-            f"**{prop.property_type.value} in {prop.location.region}**\n"
-            f"Price: {prop.price_etb:,.0f} ETB | {prop.bedrooms} Bed"
-        )
+    for prop in properties[:10]: # Limit to 10 to avoid spam
+        media_group = [InputMediaPhoto(media=url) for url in prop.image_urls]
+        prop_details_card = create_property_card_text(prop, for_admin=False) # <<< USING UTILITY
+
         try:
-            await context.bot.send_photo(
-                chat_id=source_message.chat_id, photo=prop.image_urls[0],
-                caption=prop_summary, parse_mode='Markdown'
+            await context.bot.send_media_group(chat_id=source_message.chat_id, media=media_group)
+            await context.bot.send_message(
+                chat_id=source_message.chat_id,
+                text=prop_details_card,
+                parse_mode='Markdown'
             )
         except Exception as e:
-            logger.error(f"Failed to send photo for {prop.pid}: {e}")
-            await context.bot.send_message(chat_id=source_message.chat_id, text=prop_summary, parse_mode='Markdown')
+            logger.error(f"Failed to send rich card for property {prop.pid}: {e}")
+            await context.bot.send_message(
+                chat_id=source_message.chat_id,
+                text=f"Error displaying property {prop.pid}. Details:\n{prop_details_card}",
+                parse_mode='Markdown'
+            )
             
-    await source_message.reply_text("End of results.", reply_markup=main_menu_keyboard)
+    if len(properties) > 10:
+        await source_message.reply_text("Showing the first 10 results. For more, please refine your search.", reply_markup=main_menu_keyboard)
+    else:
+        await source_message.reply_text("End of results.", reply_markup=main_menu_keyboard)
 
-# --- Filtering Conversation ---
+# --- Filtering Conversation (This section remains unchanged) ---
 async def start_filtering(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['filters'] = {}
     await update.message.reply_text(
@@ -58,7 +67,6 @@ async def receive_filter_prop_type(update: Update, context: ContextTypes.DEFAULT
     try:
         prop_type = PropertyType(update.message.text)
         context.user_data['filters']['property_type'] = prop_type
-        
         await update.message.reply_text(
             text=t('how_many_bedrooms', default="How many bedrooms?"),
             reply_markup=keyboards.get_bedroom_keyboard(is_filter=True)
@@ -70,7 +78,7 @@ async def receive_filter_prop_type(update: Update, context: ContextTypes.DEFAULT
 
 async def receive_filter_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     bedrooms_text = update.message.text
-    if bedrooms_text != ANY_OPTION: # Use constant
+    if bedrooms_text != ANY_OPTION:
         try:
             min_bedrooms = int(bedrooms_text.replace('+', ''))
             context.user_data['filters']['min_bedrooms'] = min_bedrooms
@@ -86,7 +94,7 @@ async def receive_filter_bedrooms(update: Update, context: ContextTypes.DEFAULT_
 
 async def receive_filter_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     region_text = update.message.text
-    if region_text != ANY_REGION: # Use constant
+    if region_text != ANY_REGION:
         context.user_data['filters']['location_region'] = region_text
 
     await update.message.reply_text(
@@ -97,17 +105,15 @@ async def receive_filter_region(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def receive_filter_price_range(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     price_text = update.message.text
-    if price_text != ANY_PRICE: # Use constant
+    if price_text != ANY_PRICE:
         price_value = keyboards.PRICE_RANGES_TEXT.get(price_text)
         if not price_value:
             await update.message.reply_text("Invalid choice. Please use the keyboard.")
             return STATE_FILTER_PRICE_RANGE
-            
         price_range = price_value.split('-')
         context.user_data['filters']['min_price'] = float(price_range[0])
         context.user_data['filters']['max_price'] = float(price_range[1])
     
-    # This logic was already correct!
     filters_so_far = context.user_data['filters']
     if filters_so_far.get('property_type') == PropertyType.CONDOMINIUM:
         await update.message.reply_text(
@@ -116,7 +122,6 @@ async def receive_filter_price_range(update: Update, context: ContextTypes.DEFAU
         )
         return STATE_FILTER_CONDO_SCHEME
 
-    # If not a condo, finalize and show results
     final_filters = PropertyFilter(**filters_so_far)
     await show_properties(update, context, final_filters)
     context.user_data.pop('filters', None)
@@ -124,19 +129,19 @@ async def receive_filter_price_range(update: Update, context: ContextTypes.DEFAU
 
 async def receive_filter_condo_scheme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     scheme_text = update.message.text
-    if scheme_text != ANY_SCHEME: # Use constant
+    if scheme_text != ANY_SCHEME:
         try:
             context.user_data['filters']['condominium_scheme'] = CondoScheme(scheme_text)
         except ValueError:
             await update.message.reply_text("Invalid choice. Please use the keyboard.")
             return STATE_FILTER_CONDO_SCHEME
             
-    # This is the final step, show results
     final_filters = PropertyFilter(**context.user_data['filters'])
     await show_properties(update, context, final_filters)
     context.user_data.pop('filters', None)
     return ConversationHandler.END
 
 async def browse_all_properties(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler for browsing all properties without filters."""
     await show_properties(update, context, PropertyFilter())
     return ConversationHandler.END
