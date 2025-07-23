@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     # Telegram
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN")
+    ADMIN_TG_USERNAME: str = os.getenv("ADMIN_TG_USERNAME")  # Default to a placeholder if not set
     WEB_APP_URL: str = "https://realestate.et"
     
     # Admin
