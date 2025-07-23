@@ -52,7 +52,8 @@ async def receive_bathrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         bathrooms = int(update.message.text.replace('+', ''))
         context.user_data['submission_data']['bathrooms'] = bathrooms
         await update.message.reply_text(
-            text=t('what_is_size', default="What is the approximate size?"),
+            text=t('what_is_size', default="What is the approximate size in square meters?"),
+            # --- FIX: Call the correct, newly created keyboard function ---
             reply_markup=keyboards.get_size_range_keyboard()
         )
         return STATE_SUBMIT_SIZE
@@ -62,18 +63,21 @@ async def receive_bathrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 async def receive_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     size_text = update.message.text
-    size_value = next((v for k, v in keyboards.SIZE_RANGES.items() if k == size_text), None)
+    # --- FIX: Use the correct, newly created dictionary ---
+    size_value = keyboards.SIZE_RANGES_TEXT.get(size_text)
     if not size_value:
         await update.message.reply_text("Invalid choice. Please use the keyboard.")
         return STATE_SUBMIT_SIZE
         
     size_range = size_value.split('-')
+    # Take the average of the range for an approximate value
     size_sqm = (int(size_range[0]) + int(size_range[1])) / 2
     context.user_data['submission_data']['size_sqm'] = size_sqm
 
     await update.message.reply_text(
         text=t('select_region', default="Which region?"),
-        reply_markup=keyboards.get_region_keyboard()
+        # We don't want "Any Region" for submission
+        reply_markup=keyboards.get_region_keyboard(is_filter=False)
     )
     return STATE_SUBMIT_LOCATION_REGION
 

@@ -12,6 +12,7 @@ translations = {
         'buyer_role': "I'm a Buyer",
         'broker_role': "I'm a Broker",
         'admin_pending_listings': "⏳ View Pending Listings",
+        'back_to_main_menu': "⬅️ Back to Main Menu", # <<< ADD THIS LINE
         'admin_approve': "✅ Approve",
         'admin_reject': "❌ Reject",
         'select_property_type': "Please select a property type:",

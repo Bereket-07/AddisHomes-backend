@@ -18,10 +18,17 @@ CB_PREFIX_PRICE_RANGE = "price_"
 
 # Admin
 CB_ADMIN_PENDING_LISTINGS = "admin_pending"
-CB_ADMIN_APPROVE = "admin_approve"
+CB_ADMIN_APPROVE = "admin_approve" # Note: constant uses underscore
 CB_ADMIN_REJECT = "admin_reject"
 
-# Conversation States
+# --- Reply Keyboard Special Options ---
+ANY_OPTION = "Any"
+ANY_PRICE = "Any Price"
+ANY_REGION = "Any Region"
+ANY_SCHEME = "Any Scheme"
+DONE_UPLOADING = "(?i)^done$" # Regex for "done"
+
+# --- Conversation States ---
 (
     # Main menu state
     STATE_MAIN,
@@ -34,6 +41,6 @@ CB_ADMIN_REJECT = "admin_reject"
     STATE_FILTER_LOCATION_CITY, STATE_FILTER_PRICE_RANGE, STATE_FILTER_SHOW_RESULTS,
     # Admin state
     STATE_ADMIN_REJECT_REASON_INPUT,
-    # --- THIS IS THE MISSING LINE ---
+    # The new state for the condo scheme filter
     STATE_FILTER_CONDO_SCHEME
-) = range(18) # The range must be updated to 18
+) = range(18) # The range is correctly updated to 18

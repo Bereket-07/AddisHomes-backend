@@ -61,7 +61,7 @@ async def receive_filter_prop_type(update: Update, context: ContextTypes.DEFAULT
         
         await update.message.reply_text(
             text=t('how_many_bedrooms', default="How many bedrooms?"),
-            reply_markup=keyboards.get_bedroom_keyboard()
+            reply_markup=keyboards.get_bedroom_keyboard(is_filter=True)
         )
         return STATE_FILTER_BEDROOMS
     except ValueError:
@@ -70,9 +70,8 @@ async def receive_filter_prop_type(update: Update, context: ContextTypes.DEFAULT
 
 async def receive_filter_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     bedrooms_text = update.message.text
-    if bedrooms_text != "Any":
+    if bedrooms_text != ANY_OPTION: # Use constant
         try:
-            # Handle "6+" case
             min_bedrooms = int(bedrooms_text.replace('+', ''))
             context.user_data['filters']['min_bedrooms'] = min_bedrooms
         except (ValueError, TypeError):
@@ -81,13 +80,13 @@ async def receive_filter_bedrooms(update: Update, context: ContextTypes.DEFAULT_
     
     await update.message.reply_text(
         text=t('select_region', default="Which region?"),
-        reply_markup=keyboards.get_region_keyboard()
+        reply_markup=keyboards.get_region_keyboard(is_filter=True)
     )
     return STATE_FILTER_LOCATION_REGION
 
 async def receive_filter_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     region_text = update.message.text
-    if region_text != "Any Region":
+    if region_text != ANY_REGION: # Use constant
         context.user_data['filters']['location_region'] = region_text
 
     await update.message.reply_text(
@@ -98,7 +97,7 @@ async def receive_filter_region(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def receive_filter_price_range(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     price_text = update.message.text
-    if price_text != "Any Price":
+    if price_text != ANY_PRICE: # Use constant
         price_value = keyboards.PRICE_RANGES_TEXT.get(price_text)
         if not price_value:
             await update.message.reply_text("Invalid choice. Please use the keyboard.")
@@ -108,14 +107,14 @@ async def receive_filter_price_range(update: Update, context: ContextTypes.DEFAU
         context.user_data['filters']['min_price'] = float(price_range[0])
         context.user_data['filters']['max_price'] = float(price_range[1])
     
-    # Check if we need to ask for condo scheme
+    # This logic was already correct!
     filters_so_far = context.user_data['filters']
     if filters_so_far.get('property_type') == PropertyType.CONDOMINIUM:
         await update.message.reply_text(
             text=t('select_condo_scheme', default="Select a Condominium scheme:"),
             reply_markup=keyboards.get_condo_scheme_keyboard()
         )
-        return STATE_FILTER_CONDO_SCHEME # We need a new state for this
+        return STATE_FILTER_CONDO_SCHEME
 
     # If not a condo, finalize and show results
     final_filters = PropertyFilter(**filters_so_far)
@@ -125,7 +124,7 @@ async def receive_filter_price_range(update: Update, context: ContextTypes.DEFAU
 
 async def receive_filter_condo_scheme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     scheme_text = update.message.text
-    if scheme_text != "Any Scheme":
+    if scheme_text != ANY_SCHEME: # Use constant
         try:
             context.user_data['filters']['condominium_scheme'] = CondoScheme(scheme_text)
         except ValueError:
@@ -138,7 +137,6 @@ async def receive_filter_condo_scheme(update: Update, context: ContextTypes.DEFA
     context.user_data.pop('filters', None)
     return ConversationHandler.END
 
-# --- See All Handler ---
 async def browse_all_properties(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_properties(update, context, PropertyFilter())
     return ConversationHandler.END

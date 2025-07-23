@@ -4,7 +4,7 @@ from telegram.ext import (
 )
 from src.utils.config import settings
 from src.utils.i18n import t
-from src.utils.constants import *
+from src.utils.constants import * # Import all constants
 from src.use_cases.user_use_cases import UserUseCases
 from src.use_cases.property_use_cases import PropertyUseCases
 from .handlers import (
@@ -29,11 +29,10 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
             STATE_SUBMIT_BATHROOMS: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_bathrooms)],
             STATE_SUBMIT_SIZE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_size)],
             STATE_SUBMIT_LOCATION_REGION: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_location_region)],
-            # States that expect free text input (not from a reply keyboard)
             STATE_SUBMIT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_price)],
             STATE_SUBMIT_IMAGES: [
                 MessageHandler(filters.PHOTO, broker_handlers.receive_images),
-                MessageHandler(filters.Regex(r'(?i)^done$'), broker_handlers.done_receiving_images),
+                MessageHandler(filters.Regex(DONE_UPLOADING), broker_handlers.done_receiving_images),
             ],
             STATE_SUBMIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_description)],
         },
@@ -57,20 +56,18 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
 
     # 3. Admin: Property Rejection Flow
     admin_rejection_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(admin_handlers.reject_property_start, pattern=f"^admin_reject_")],
+        # Use the constant for the pattern
+        entry_points=[CallbackQueryHandler(admin_handlers.reject_property_start, pattern=f"^{CB_ADMIN_REJECT}_")],
         states={
             STATE_ADMIN_REJECT_REASON_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handlers.reject_property_reason)]
         },
-        fallbacks=[CommandHandler("cancel", common_handlers.cancel_conversation)], # Can also use /cancel command
+        fallbacks=[CommandHandler("cancel", common_handlers.cancel_conversation)],
         per_message=False
     )
 
     # --- REGISTERING ALL HANDLERS ---
 
-    # Entry point for the entire bot
     application.add_handler(CommandHandler("start", common_handlers.start))
-
-    # Handler for new users selecting their initial role
     application.add_handler(MessageHandler(
         filters.Regex(f"^{t('buyer_role')}|{t('broker_role')}$"),
         common_handlers.set_user_role
@@ -81,17 +78,15 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     application.add_handler(filter_conv)
     application.add_handler(admin_rejection_conv)
 
-    # Add MessageHandlers for top-level main menu commands that are NOT conversations
-    # These are one-off actions.
+    # Add MessageHandlers for top-level main menu actions
     application.add_handler(MessageHandler(filters.Regex(f"^{t('browse_properties')}$"), buyer_handlers.browse_all_properties))
     application.add_handler(MessageHandler(filters.Regex(f"^{t('my_listings')}$"), broker_handlers.my_listings))
     application.add_handler(MessageHandler(filters.Regex(f"^{t('admin_panel')}$"), admin_handlers.admin_panel))
     application.add_handler(MessageHandler(filters.Regex(f"^{t('admin_pending_listings')}$"), admin_handlers.view_pending_listings))
     application.add_handler(MessageHandler(filters.Regex(f"^{t('back_to_main_menu')}$"), common_handlers.back_to_main_menu))
 
-    # Add the remaining CallbackQueryHandlers for inline buttons (which are now only for admin actions)
-    application.add_handler(CallbackQueryHandler(admin_handlers.approve_property, pattern=f"^admin_approve_"))
-    # Note: The entry point for rejection is a CallbackQueryHandler, but it's part of the admin_rejection_conv.
-    # The framework handles routing this correctly.
+    # Add the single CallbackQueryHandler for approving properties
+    # The rejection CbQ is the entry point for its own conversation handler.
+    application.add_handler(CallbackQueryHandler(admin_handlers.approve_property, pattern=f"^{CB_ADMIN_APPROVE}_"))
 
     return application
