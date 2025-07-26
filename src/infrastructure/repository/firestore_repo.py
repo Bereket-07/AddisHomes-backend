@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from google.cloud import firestore
 from google.api_core.exceptions import GoogleAPICallError
 from src.domain.models.user_models import User, UserCreate, UserInDB, UserRole
+from google.cloud.firestore_v1.base_query import FieldFilter
 from src.domain.models.property_models import Property, PropertyCreate, PropertyInDB, PropertyFilter, PropertyStatus
 from src.utils.config import settings
 from src.utils.exceptions import DatabaseError, UserNotFoundError, PropertyNotFoundError
@@ -150,23 +151,42 @@ class RealEstateRepository:
     async def query_properties(self, filters: PropertyFilter) -> List[Property]:
         try:
             status_to_query = filters.status.value if filters.status else PropertyStatus.APPROVED.value
-            query = self.properties_collection.where('status', '==', status_to_query)
+            query = self.properties_collection.where(filter=FieldFilter('status', '==', status_to_query))
 
             if filters.property_type:
-                query = query.where('property_type', '==', filters.property_type.value)
+                query = query.where(filter=FieldFilter('property_type', '==', filters.property_type.value))
             if filters.min_bedrooms:
-                query = query.where('bedrooms', '>=', filters.min_bedrooms)
+                query = query.where(filter=FieldFilter('bedrooms', '>=', filters.min_bedrooms))
             if filters.max_bedrooms:
-                query = query.where('bedrooms', '<=', filters.max_bedrooms)
+                query = query.where(filter=FieldFilter('bedrooms', '<=', filters.max_bedrooms))
             if filters.location_region:
-                query = query.where('location.region', '==', filters.location_region)
+                query = query.where(filter=FieldFilter('location.region', '==', filters.location_region))
             if filters.min_price:
-                query = query.where('price_etb', '>=', filters.min_price)
+                query = query.where(filter=FieldFilter('price_etb', '>=', filters.min_price))
             if filters.max_price:
-                query = query.where('price_etb', '<=', filters.max_price)
+                query = query.where(filter=FieldFilter('price_etb', '<=', filters.max_price))
+            if filters.min_floor_level is not None:
+                # Firestore does not support inequality filters on multiple fields.
+                # Since we likely already filter on price or bedrooms, we cannot
+                # add another inequality filter for 'floor_level'.
+                #
+                # SOLUTION: We will do this filtering in Python after getting the results.
+                # This is a common and acceptable pattern when dealing with Firestore's limitations.
+                pass # Logic will be handled below
             
-            docs = query.stream()
-            return [Property(**doc.to_dict()) async for doc in docs]
+            docs_stream = query.stream()
+            all_results = [Property(**doc.to_dict()) async for doc in docs_stream]
+
+            # --- POST-QUERY FILTERING IN PYTHON ---
+            if filters.min_floor_level is not None:
+                final_results = [
+                    prop for prop in all_results 
+                    if prop.floor_level is not None and prop.floor_level >= filters.min_floor_level
+                ]
+                return final_results
+            # --- END POST-QUERY FILTERING ---
+
+            return all_results
         except GoogleAPICallError as e:
             raise DatabaseError(f"Firestore error while querying properties: {e}")
     async def delete_property(self, pid: str) -> None:

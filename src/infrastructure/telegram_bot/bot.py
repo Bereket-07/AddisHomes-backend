@@ -52,15 +52,29 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
 
     # 2. Buyer: Property Filtering Flow
     filter_conv = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex(f"^{t('filter_properties')}$"), buyer_handlers.start_filtering)],
+        entry_points=[MessageHandler(filters.Regex(create_i18n_regex('filter_properties')), buyer_handlers.start_filtering)],
         states={
-            STATE_FILTER_PROP_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_prop_type)],
-            STATE_FILTER_BEDROOMS: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_bedrooms)],
-            STATE_FILTER_LOCATION_REGION: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_region)],
-            STATE_FILTER_PRICE_RANGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_price_range)],
-            STATE_FILTER_CONDO_SCHEME: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_condo_scheme)],
+            # We will add ~filters.Regex(create_i18n_regex('cancel')) to each state's filter
+            STATE_FILTER_PROP_TYPE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_prop_type)
+            ],
+            STATE_FILTER_BEDROOMS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_bedrooms)
+            ],
+            STATE_FILTER_VILLA_STRUCTURE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_villa_structure)
+            ],
+            STATE_FILTER_LOCATION_REGION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_region)
+            ],
+            STATE_FILTER_PRICE_RANGE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_price_range)
+            ],
+            STATE_FILTER_CONDO_SCHEME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_condo_scheme)
+            ],
         },
-        fallbacks=[MessageHandler(filters.Regex(f"^{t('cancel')}$"), common_handlers.cancel_conversation)],
+        fallbacks=[MessageHandler(filters.Regex(create_i18n_regex('cancel')), common_handlers.cancel_conversation)],
         per_message=False
     )
 

@@ -38,7 +38,12 @@ def create_property_card_text(prop: Property, for_admin: bool = False, for_broke
     details_list.append(f"**🛁 Bathrooms:** {prop.bathrooms}")
 
     if prop.floor_level is not None:
-        details_list.append(f"**🧗 Floor Level:** {prop.floor_level}")
+        if prop.property_type == PropertyType.VILLA:
+            # Display as G+ for villas
+            details_list.append(f"**🧗 Structure:** G+{prop.floor_level}")
+        else:
+            # Display as Floor Level for others
+            details_list.append(f"**🧗 Floor Level:** {prop.floor_level}")
     if prop.furnishing_status:
         details_list.append(f"**🛋️ Furnishing:** {prop.furnishing_status.value}")
     if prop.parking_spaces is not None:

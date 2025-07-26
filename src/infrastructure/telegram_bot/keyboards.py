@@ -1,6 +1,6 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from src.domain.models.user_models import User, UserRole
-from src.domain.models.property_models import PropertyType, CondoScheme , FurnishingStatus
+from src.domain.models.property_models import PropertyType, CondoScheme, FurnishingStatus
 from src.utils.i18n import t
 from src.utils.constants import *
 from src.utils.data_loader import location_data # Import our data loader
@@ -13,11 +13,15 @@ REMOVE_KEYBOARD = ReplyKeyboardRemove()
 BEDROOM_OPTIONS = ["1", "2", "3", "4", "5", "6+"]
 BATHROOM_OPTIONS = ["1", "2", "3", "4+"]
 REGIONS = ["Addis Ababa", "Amhara", "Oromia", "Other"]
+# Note: Text-based options like below should ideally be in i18n.py if they need translation
+# For now, we assume they are static or the number is the key part.
 FLOOR_LEVEL_OPTIONS = ["0 (Ground)", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10+"]
 PARKING_SPACES_OPTIONS = ["0", "1", "2", "3", "4+"]
 CONDO_SCHEMES = [cs.value for cs in CondoScheme]
 
-# --- FIX: Added the missing size ranges ---
+G_PLUS_OPTIONS = ["G+0", "G+1", "G+2", "G+3", "G+4", "G+5+"]
+
+
 SIZE_RANGES_TEXT = {
     "Under 50 m²": "0-50",
     "50 - 100 m²": "50-100",
@@ -54,27 +58,29 @@ def get_main_menu_keyboard(user: User) -> ReplyKeyboardMarkup:
 def get_admin_panel_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
     options = [
         t('admin_pending_listings', lang=lang),
-        "🗂️ Manage Listings", 
-        "📊 View Analytics", 
+        t('admin_manage_listings', lang=lang, default="🗂️ Manage Listings"), 
+        t('admin_view_analytics', lang=lang, default="📊 View Analytics"), 
         t('back_to_main_menu', lang=lang)
     ]
     return create_reply_options_keyboard(options, columns=1, add_cancel=False, lang=lang)
+
 def create_admin_management_keyboard(prop_id: str, lang: str = 'en') -> InlineKeyboardMarkup:
     """Keyboard for managing an existing approved property."""
     keyboard = [[
-        InlineKeyboardButton("💰 Mark as Sold", callback_data=f"{CB_ADMIN_MARK_SOLD}_{prop_id}"),
-        InlineKeyboardButton("🗑️ Delete", callback_data=f"{CB_ADMIN_DELETE_CONFIRM}_{prop_id}")
-    ]]
-    return InlineKeyboardMarkup(keyboard)
-def create_delete_confirmation_keyboard(prop_id: str, lang: str = 'en') -> InlineKeyboardMarkup:
-    """Keyboard to confirm a permanent delete action."""
-    keyboard = [[
-        InlineKeyboardButton("⚠️ YES, DELETE PERMANENTLY ⚠️", callback_data=f"{CB_ADMIN_DELETE_EXECUTE}_{prop_id}"),
-        InlineKeyboardButton("❌ No, Cancel", callback_data=f"{CB_ADMIN_DELETE_CANCEL}_{prop_id}")
+        InlineKeyboardButton(t('admin_mark_sold', lang=lang, default="💰 Mark as Sold"), callback_data=f"{CB_ADMIN_MARK_SOLD}_{prop_id}"),
+        InlineKeyboardButton(t('admin_delete', lang=lang, default="🗑️ Delete"), callback_data=f"{CB_ADMIN_DELETE_CONFIRM}_{prop_id}")
     ]]
     return InlineKeyboardMarkup(keyboard)
 
-def get_role_selection_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
+def create_delete_confirmation_keyboard(prop_id: str, lang: str = 'en') -> InlineKeyboardMarkup:
+    """Keyboard to confirm a permanent delete action."""
+    keyboard = [[
+        InlineKeyboardButton(t('admin_delete_confirm_yes', lang=lang, default="⚠️ YES, DELETE PERMANENTLY ⚠️"), callback_data=f"{CB_ADMIN_DELETE_EXECUTE}_{prop_id}"),
+        InlineKeyboardButton(t('admin_delete_confirm_no', lang=lang, default="❌ No, Cancel"), callback_data=f"{CB_ADMIN_DELETE_CANCEL}_{prop_id}")
+    ]]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_role_selection_keyboard() -> ReplyKeyboardMarkup:
     # Use both languages for first-time selection
     options = [t('buyer_role', lang='en'), t('broker_role', lang='en'), t('buyer_role', lang='am'), t('broker_role', lang='am')]
     return create_reply_options_keyboard(options, add_cancel=False)
@@ -86,67 +92,72 @@ def get_language_selection_keyboard() -> ReplyKeyboardMarkup:
 
 # --- Submission & Filter Flow Keyboards ---
 def get_property_type_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
-    return create_reply_options_keyboard([pt.value for pt in PropertyType])
+    return create_reply_options_keyboard([pt.value for pt in PropertyType], lang=lang)
 
-def get_sub_city_keyboard() -> ReplyKeyboardMarkup:
+def get_sub_city_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
     """Creates a dynamic keyboard for Addis Ababa sub-cities."""
-    return create_reply_options_keyboard(location_data.get_addis_sub_cities(), columns=2)
+    return create_reply_options_keyboard(location_data.get_addis_sub_cities(), columns=2, lang=lang)
 
-def get_neighborhood_keyboard(sub_city: str) -> ReplyKeyboardMarkup:
+def get_neighborhood_keyboard(sub_city: str, lang: str = 'en') -> ReplyKeyboardMarkup:
     """Creates a dynamic keyboard of neighborhoods for a given sub-city."""
-    return create_reply_options_keyboard(location_data.get_neighborhoods_for_sub_city(sub_city), columns=2)
+    return create_reply_options_keyboard(location_data.get_neighborhoods_for_sub_city(sub_city), columns=2, lang=lang)
 
-def get_condo_site_keyboard(sub_city: str) -> ReplyKeyboardMarkup:
+def get_condo_site_keyboard(sub_city: str, lang: str = 'en') -> ReplyKeyboardMarkup:
     """Creates a dynamic keyboard of condominium sites for a given sub-city."""
-    return create_reply_options_keyboard(location_data.get_condo_sites_for_sub_city(sub_city), columns=1)
+    return create_reply_options_keyboard(location_data.get_condo_sites_for_sub_city(sub_city), columns=1, lang=lang)
 
-def get_numeric_keyboard(options: list) -> ReplyKeyboardMarkup:
+def get_numeric_keyboard(options: list, lang: str = 'en') -> ReplyKeyboardMarkup:
     """Helper for numeric choice keyboards like bedrooms/bathrooms."""
-    return create_reply_options_keyboard(options, columns=4)
+    return create_reply_options_keyboard(options, columns=4, lang=lang)
 
 def get_bedroom_keyboard(is_filter: bool = False, lang: str = 'en') -> ReplyKeyboardMarkup:
-    options = BEDROOM_OPTIONS
+    options = BEDROOM_OPTIONS[:] # Create a copy
     if is_filter:
-        options = options + [ANY_OPTION]
-    return create_reply_options_keyboard(options, columns=4)
+        options.append(t('any_option', lang=lang))
+    return create_reply_options_keyboard(options, columns=4, lang=lang)
 
 def get_bathroom_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
-    return create_reply_options_keyboard(BATHROOM_OPTIONS, columns=4)
+    return create_reply_options_keyboard(BATHROOM_OPTIONS, columns=4, lang=lang)
 
-# --- FIX: Added the missing keyboard function ---
 def get_size_range_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
-    return create_reply_options_keyboard(list(SIZE_RANGES_TEXT.keys()), columns=2)
+    return create_reply_options_keyboard(list(SIZE_RANGES_TEXT.keys()), columns=2, lang=lang)
 
 def get_price_range_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
-    options = list(PRICE_RANGES_TEXT.keys()) + [ANY_PRICE]
-    return create_reply_options_keyboard(options, columns=2)
+    options = list(PRICE_RANGES_TEXT.keys())
+    options.append(t('any_price', lang=lang))
+    return create_reply_options_keyboard(options, columns=2, lang=lang)
 
 def get_region_keyboard(is_filter: bool = False, lang: str = 'en') -> ReplyKeyboardMarkup:
-    options = REGIONS
+    options = REGIONS[:] # Create a copy
     if is_filter:
-        options = options + [ANY_REGION]
-    return create_reply_options_keyboard(options)
-
-def get_condo_scheme_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
-    options = CONDO_SCHEMES + [ANY_SCHEME]
-    return create_reply_options_keyboard(options)
+        options.append(t('any_region', lang=lang))
+    return create_reply_options_keyboard(options, lang=lang)
 
 def get_furnishing_status_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
-    return create_reply_options_keyboard([fs.value for fs in FurnishingStatus], columns=3)
+    return create_reply_options_keyboard([fs.value for fs in FurnishingStatus], columns=3, lang=lang)
 
-def get_boolean_keyboard(yes_text="Yes", no_text="No", lang: str = 'en') -> ReplyKeyboardMarkup: # <<< NEW FUNCTION
+def get_boolean_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
     """Creates a simple Yes/No keyboard."""
-    return create_reply_options_keyboard([yes_text, no_text], columns=2)
+    options = [t('yes', lang=lang), t('no', lang=lang)]
+    return create_reply_options_keyboard(options, columns=2, lang=lang)
 
-def get_condo_scheme_keyboard(is_filter: bool = False) -> ReplyKeyboardMarkup:
-    options = CONDO_SCHEMES
+def get_condo_scheme_keyboard(is_filter: bool = False, lang: str = 'en') -> ReplyKeyboardMarkup:
+    options = CONDO_SCHEMES[:] # Create a copy
     if is_filter:
-        options = options + [ANY_SCHEME]
-    return create_reply_options_keyboard(options)
+        options.append(t('any_scheme', lang=lang))
+    return create_reply_options_keyboard(options, lang=lang)
+# --- NEW KEYBOARD FUNCTION FOR VILLA STRUCTURE ---
+def get_g_plus_keyboard(is_filter: bool = False, lang: str = 'en') -> ReplyKeyboardMarkup:
+    """Creates a keyboard for Villa G+ options."""
+    options = G_PLUS_OPTIONS[:] # Create a copy
+    if is_filter:
+        options.append(t('any_option', lang=lang))
+    return create_reply_options_keyboard(options, columns=3, lang=lang)
 
-def get_image_upload_keyboard() -> ReplyKeyboardMarkup:
+
+def get_image_upload_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
     """Creates a keyboard with a 'Done' button for image uploads."""
-    keyboard = [[KeyboardButton(DONE_UPLOADING_TEXT)], [KeyboardButton(t('cancel'))]]
+    keyboard = [[KeyboardButton(DONE_UPLOADING_TEXT)], [KeyboardButton(t('cancel', lang=lang))]]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 # --- Inline Keyboard for Admin Actions ---

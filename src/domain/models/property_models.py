@@ -55,3 +55,4 @@ class PropertyFilter(BaseModel):
     max_size_sqm: Optional[float] = None
     condominium_scheme: Optional[CondoScheme] = None
     furnishing_status: Optional[FurnishingStatus] = None
+    min_floor_level: Optional[int] = None
