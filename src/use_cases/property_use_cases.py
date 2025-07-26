@@ -40,6 +40,19 @@ class PropertyUseCases:
     async def find_properties(self, filters: PropertyFilter) -> List[Property]:
         """Buyer/Admin/Broker finds approved properties based on filters."""
         return await self.repo.query_properties(filters)
+    async def mark_property_as_sold(self, property_id: str) -> Property:
+        """Admin marks an approved property as sold."""
+        prop_to_sell = await self.repo.get_property_by_id(property_id)
+        if prop_to_sell.status != PropertyStatus.APPROVED:
+            raise InvalidOperationError(f"Cannot mark as sold. Property must be in 'approved' status.")
+        
+        update_data = {"status": PropertyStatus.SOLD.value}
+        return await self.repo.update_property(property_id, update_data)
+    async def delete_property(self, property_id: str):
+        """Admin permanently deletes a property."""
+        # Business logic checks could be added here if needed
+        # For now, we allow deleting a property in any state
+        await self.repo.delete_property(property_id)
         
     async def get_properties_by_broker(self, broker_id: str) -> List[Property]:
         """Broker fetches their own submitted properties."""
@@ -48,3 +61,6 @@ class PropertyUseCases:
     async def get_property_details(self, property_id: str) -> Property: # <<< No longer Optional
         """Fetches full details for a single property."""
         return await self.repo.get_property_by_id(property_id)
+    async def get_analytics_summary(self) -> dict:
+        """Retrieves a summary of property counts by status."""
+        return await self.repo.count_properties_by_status()

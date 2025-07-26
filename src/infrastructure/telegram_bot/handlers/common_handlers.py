@@ -6,7 +6,7 @@ import logging
 from telegram.ext import ContextTypes, ConversationHandler
 from telegram.error import TelegramError
 from src.use_cases.user_use_cases import UserUseCases
-from src.domain.models.user_models import UserRole
+from src.domain.models.user_models import UserRole , User
 from .. import keyboards
 from src.utils.i18n import t
 from src.utils.exceptions import RealEstatePlatformException, TelegramApiError
@@ -164,3 +164,31 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
         reply_markup=keyboards.get_main_menu_keyboard(user)
     )
     return ConversationHandler.END
+
+
+@handle_exceptions
+@ensure_user_data
+async def select_language_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Shows the language selection menu."""
+    user = context.user_data['user']
+    await update.message.reply_text(
+        text=t('select_language_prompt', lang=user.language),
+        reply_markup=keyboards.get_language_selection_keyboard()
+    )
+@handle_exceptions
+@ensure_user_data
+async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sets the user's language and returns to the main menu."""
+    user = context.user_data['user']
+    user_use_cases: UserUseCases = context.bot_data["user_use_cases"]
+
+    chosen_lang = update.message.text
+    lang_code = 'am' if 'አማርኛ' in chosen_lang else 'en'
+    
+    updated_user = await user_use_cases.set_user_language(user.uid, lang_code)
+    context.user_data['user'] = updated_user # IMPORTANT: Update context
+    
+    await update.message.reply_text(
+        text=t('language_updated', lang=lang_code, lang_name=chosen_lang),
+        reply_markup=keyboards.get_main_menu_keyboard(updated_user)
+    )

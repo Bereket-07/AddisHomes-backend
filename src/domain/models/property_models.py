@@ -42,6 +42,7 @@ class Property(PropertyInDB):
         from_attributes = True
 
 class PropertyFilter(BaseModel):
+    status: Optional[PropertyStatus] = None
     property_type: Optional[PropertyType] = None
     min_bedrooms: Optional[int] = None
     max_bedrooms: Optional[int] = None

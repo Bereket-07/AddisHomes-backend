@@ -3,7 +3,7 @@ from telegram.ext import (
     ConversationHandler
 )
 from src.utils.config import settings
-from src.utils.i18n import t
+from src.utils.i18n import t, create_i18n_regex 
 from src.utils.constants import * # Import all constants
 from src.use_cases.user_use_cases import UserUseCases
 from src.use_cases.property_use_cases import PropertyUseCases
@@ -21,7 +21,7 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     # --- CONVERSATION HANDLER DEFINITIONS ---
     # 1. Broker: Property Submission Flow
     submission_conv = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex(f"^{t('submit_property')}$"), broker_handlers.start_submission)],
+        entry_points=[MessageHandler(filters.Regex(create_i18n_regex('submit_property')), broker_handlers.start_submission)],
         states={
             STATE_SUBMIT_PROP_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_property_type)],
             STATE_SUBMIT_LOCATION_SUB_CITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_sub_city)],
@@ -46,7 +46,7 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
             ],
             STATE_SUBMIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_description)],
         },
-        fallbacks=[MessageHandler(filters.Regex(f"^{t('cancel')}$"), common_handlers.cancel_conversation)],
+        fallbacks=[MessageHandler(filters.Regex(create_i18n_regex('cancel')), common_handlers.cancel_conversation)],
         per_message=False
     )
 
@@ -78,9 +78,10 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     # --- REGISTERING ALL HANDLERS ---
 
     application.add_handler(CommandHandler("start", common_handlers.start))
+    # This handler now needs to be more robust
+    role_regex = f"^({t('buyer_role', lang='en')}|{t('broker_role', lang='en')}|{t('buyer_role', lang='am')}|{t('broker_role', lang='am')})$"
     application.add_handler(MessageHandler(
-        filters.Regex(f"^{t('buyer_role')}|{t('broker_role')}$"),
-        common_handlers.set_user_role
+        filters.Regex(role_regex), common_handlers.set_user_role
     ))
 
     # Add Conversation Handlers for multi-step processes
@@ -88,15 +89,25 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     application.add_handler(filter_conv)
     application.add_handler(admin_rejection_conv)
 
+    # NEW handler for language selection
+    application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('language_select')), common_handlers.select_language_start))
+    application.add_handler(MessageHandler(filters.Regex(r'^(English 🇬🇧|አማርኛ 🇪🇹)$'), common_handlers.set_language))
+
     # Add MessageHandlers for top-level main menu actions
-    application.add_handler(MessageHandler(filters.Regex(f"^{t('browse_properties')}$"), buyer_handlers.browse_all_properties))
-    application.add_handler(MessageHandler(filters.Regex(f"^{t('my_listings')}$"), broker_handlers.my_listings))
-    application.add_handler(MessageHandler(filters.Regex(f"^{t('admin_panel')}$"), admin_handlers.admin_panel))
-    application.add_handler(MessageHandler(filters.Regex(f"^{t('admin_pending_listings')}$"), admin_handlers.view_pending_listings))
-    application.add_handler(MessageHandler(filters.Regex(f"^{t('back_to_main_menu')}$"), common_handlers.back_to_main_menu))
+    application.add_handler(MessageHandler(filters.Regex(f"^🗂️ Manage Listings$"), admin_handlers.manage_listings))
+    application.add_handler(MessageHandler(filters.Regex(f"^📊 View Analytics$"), admin_handlers.view_analytics))
+    application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('browse_properties')), buyer_handlers.browse_all_properties))
+    application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('my_listings')), broker_handlers.my_listings))
+    application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('admin_panel')), admin_handlers.admin_panel))
+    application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('admin_pending_listings')), admin_handlers.view_pending_listings))
+    application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('back_to_main_menu')), common_handlers.back_to_main_menu))
 
     # Add the single CallbackQueryHandler for approving properties
     # The rejection CbQ is the entry point for its own conversation handler.
     application.add_handler(CallbackQueryHandler(admin_handlers.approve_property, pattern=f"^{CB_ADMIN_APPROVE}_"))
+    application.add_handler(CallbackQueryHandler(admin_handlers.mark_as_sold, pattern=f"^{CB_ADMIN_MARK_SOLD}_"))
+    application.add_handler(CallbackQueryHandler(admin_handlers.delete_property_confirm, pattern=f"^{CB_ADMIN_DELETE_CONFIRM}_"))
+    application.add_handler(CallbackQueryHandler(admin_handlers.delete_property_execute, pattern=f"^{CB_ADMIN_DELETE_EXECUTE}_"))
+    application.add_handler(CallbackQueryHandler(admin_handlers.delete_property_cancel, pattern=f"^{CB_ADMIN_DELETE_CANCEL}_"))
 
     return application

@@ -35,31 +35,54 @@ PRICE_RANGES_TEXT = {
 }
 
 # --- Helper Function ---
-def create_reply_options_keyboard(options: list, columns: int = 2, add_cancel=True) -> ReplyKeyboardMarkup:
+def create_reply_options_keyboard(options: list, columns: int = 2, add_cancel=True, lang: str = 'en') -> ReplyKeyboardMarkup:
     keyboard = [list(map(KeyboardButton, options[i:i + columns])) for i in range(0, len(options), columns)]
     if add_cancel:
-        keyboard.append([KeyboardButton(t('cancel'))])
+        keyboard.append([KeyboardButton(t('cancel', lang=lang))])
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
-def get_main_menu_keyboard(user: User, lang: str = 'en') -> ReplyKeyboardMarkup:
-    options = [t('browse_properties'), t('filter_properties')]
+def get_main_menu_keyboard(user: User) -> ReplyKeyboardMarkup:
+    lang = user.language
+    options = [t('browse_properties', lang=lang), t('filter_properties', lang=lang)]
     if UserRole.BROKER in user.roles:
-        options.extend([t('submit_property'), t('my_listings')])
+        options.extend([t('submit_property', lang=lang), t('my_listings', lang=lang)])
     if UserRole.ADMIN in user.roles:
-        options.append(t('admin_panel'))
-    return create_reply_options_keyboard(options, columns=2, add_cancel=False)
+        options.append(t('admin_panel', lang=lang))
+    options.append(t('language_select', lang=lang)) # Add language button
+    return create_reply_options_keyboard(options, columns=2, add_cancel=False, lang=lang)
 
-def get_admin_panel_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup: # <<< NEW FUNCTION
-    """Creates the keyboard for the admin sub-menu."""
+def get_admin_panel_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
     options = [
-        t('admin_pending_listings'),
-        # Add other admin buttons here in the future
-        t('back_to_main_menu')
+        t('admin_pending_listings', lang=lang),
+        "🗂️ Manage Listings", 
+        "📊 View Analytics", 
+        t('back_to_main_menu', lang=lang)
     ]
-    return create_reply_options_keyboard(options, columns=1, add_cancel=False)
+    return create_reply_options_keyboard(options, columns=1, add_cancel=False, lang=lang)
+def create_admin_management_keyboard(prop_id: str, lang: str = 'en') -> InlineKeyboardMarkup:
+    """Keyboard for managing an existing approved property."""
+    keyboard = [[
+        InlineKeyboardButton("💰 Mark as Sold", callback_data=f"{CB_ADMIN_MARK_SOLD}_{prop_id}"),
+        InlineKeyboardButton("🗑️ Delete", callback_data=f"{CB_ADMIN_DELETE_CONFIRM}_{prop_id}")
+    ]]
+    return InlineKeyboardMarkup(keyboard)
+def create_delete_confirmation_keyboard(prop_id: str, lang: str = 'en') -> InlineKeyboardMarkup:
+    """Keyboard to confirm a permanent delete action."""
+    keyboard = [[
+        InlineKeyboardButton("⚠️ YES, DELETE PERMANENTLY ⚠️", callback_data=f"{CB_ADMIN_DELETE_EXECUTE}_{prop_id}"),
+        InlineKeyboardButton("❌ No, Cancel", callback_data=f"{CB_ADMIN_DELETE_CANCEL}_{prop_id}")
+    ]]
+    return InlineKeyboardMarkup(keyboard)
 
 def get_role_selection_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
-    return create_reply_options_keyboard([t('buyer_role'), t('broker_role')], add_cancel=False)
+    # Use both languages for first-time selection
+    options = [t('buyer_role', lang='en'), t('broker_role', lang='en'), t('buyer_role', lang='am'), t('broker_role', lang='am')]
+    return create_reply_options_keyboard(options, add_cancel=False)
+
+def get_language_selection_keyboard() -> ReplyKeyboardMarkup:
+    """Creates a keyboard for selecting a language."""
+    options = ["English 🇬🇧", "አማርኛ 🇪🇹"]
+    return create_reply_options_keyboard(options, columns=2, add_cancel=True, lang='en')
 
 # --- Submission & Filter Flow Keyboards ---
 def get_property_type_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
@@ -129,7 +152,7 @@ def get_image_upload_keyboard() -> ReplyKeyboardMarkup:
 # --- Inline Keyboard for Admin Actions ---
 def create_admin_approval_keyboard(prop_id: str, lang: str = 'en') -> InlineKeyboardMarkup:
     keyboard = [[
-        InlineKeyboardButton(t('admin_approve', lang), callback_data=f"{CB_ADMIN_APPROVE}_{prop_id}"),
-        InlineKeyboardButton(t('admin_reject', lang), callback_data=f"{CB_ADMIN_REJECT}_{prop_id}")
+        InlineKeyboardButton(t('admin_approve', lang=lang), callback_data=f"{CB_ADMIN_APPROVE}_{prop_id}"),
+        InlineKeyboardButton(t('admin_reject', lang=lang), callback_data=f"{CB_ADMIN_REJECT}_{prop_id}")
     ]]
     return InlineKeyboardMarkup(keyboard)

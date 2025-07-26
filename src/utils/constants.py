@@ -20,6 +20,10 @@ CB_PREFIX_PRICE_RANGE = "price_"
 CB_ADMIN_PENDING_LISTINGS = "admin_pending"
 CB_ADMIN_APPROVE = "admin_approve" # Note: constant uses underscore
 CB_ADMIN_REJECT = "admin_reject"
+CB_ADMIN_MARK_SOLD = "admin_sold"
+CB_ADMIN_DELETE_CONFIRM = "admin_del_confirm"
+CB_ADMIN_DELETE_EXECUTE = "admin_del_execute"
+CB_ADMIN_DELETE_CANCEL = "admin_del_cancel"
 
 # --- Reply Keyboard Special Options ---
 ANY_OPTION = "Any"

@@ -1,9 +1,8 @@
 # src/infrastructure/telegram_bot/handlers/admin_handlers.py
-
 import logging
 from telegram import Update, InputMediaPhoto
 from telegram.ext import ContextTypes, ConversationHandler
-from src.domain.models.property_models import Property
+from src.domain.models.property_models import Property , PropertyFilter 
 from src.use_cases.property_use_cases import PropertyUseCases
 from src.use_cases.user_use_cases import UserUseCases
 from .. import keyboards
@@ -11,6 +10,7 @@ from src.utils.i18n import t
 from src.utils.constants import *
 from src.utils.display_utils import create_property_card_text
 from .common_handlers import ensure_user_data, handle_exceptions
+from src.domain.models.common_models import PropertyStatus
 
 logger = logging.getLogger(__name__)
 
@@ -128,3 +128,135 @@ async def reject_property_reason(update: Update, context: ContextTypes.DEFAULT_T
     
     context.user_data.pop('prop_to_reject', None)
     return ConversationHandler.END
+
+@handle_exceptions
+@ensure_user_data
+async def manage_listings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Shows all APPROVED properties to the admin for management."""
+    logger.info("Admin requested to manage listings.")
+    prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
+    user = context.user_data['user']
+    
+    # We'll find properties with the 'approved' status
+    approved_props = await prop_cases.find_properties(PropertyFilter(status=PropertyStatus.APPROVED)) # We need to modify find_properties for this
+    
+    if not approved_props:
+        await update.message.reply_text(
+            "There are no approved properties to manage.",
+            reply_markup=keyboards.get_admin_panel_keyboard(lang=user.language)
+        )
+        return
+
+    await update.message.reply_text(f"Found {len(approved_props)} approved listings to manage:")
+    
+    for prop in approved_props:
+        media_group = [InputMediaPhoto(media=url) for url in prop.image_urls]
+        prop_details_card = create_property_card_text(prop, for_admin=True)
+        management_keyboard = keyboards.create_admin_management_keyboard(prop.pid, lang=user.language)
+
+        await context.bot.send_media_group(chat_id=update.effective_chat.id, media=media_group)
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=prop_details_card,
+            parse_mode='Markdown',
+            reply_markup=management_keyboard
+        )
+@handle_exceptions
+@ensure_user_data
+async def mark_as_sold(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles the 'Mark as Sold' inline button click."""
+    query = update.callback_query
+    await query.answer()
+    prop_id = query.data.split('_')[-1]
+
+    prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
+    sold_prop = await prop_cases.mark_property_as_sold(prop_id)
+    
+    await query.edit_message_text(
+        text=f"💰 **ACTION TAKEN: SOLD**\n\nProperty `{sold_prop.pid}` has been marked as sold.",
+        parse_mode='Markdown'
+    )
+
+@handle_exceptions
+@ensure_user_data
+async def delete_property_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Shows the confirmation keyboard for deleting a property."""
+    query = update.callback_query
+    await query.answer()
+    prop_id = query.data.split('_')[-1]
+    user = context.user_data['user']
+    
+    confirmation_keyboard = keyboards.create_delete_confirmation_keyboard(prop_id, lang=user.language)
+    await query.edit_message_text(
+        text=f"**ARE YOU SURE?**\n\nThis will permanently delete property `{prop_id}`. This action cannot be undone.",
+        parse_mode='Markdown',
+        reply_markup=confirmation_keyboard
+    )
+
+@handle_exceptions
+@ensure_user_data
+async def delete_property_execute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Executes the permanent deletion of a property."""
+    query = update.callback_query
+    await query.answer()
+    prop_id = query.data.split('_')[-1]
+
+    prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
+    await prop_cases.delete_property(prop_id)
+    
+    await query.edit_message_text(
+        text=f"🗑️ **ACTION TAKEN: DELETED**\n\nProperty `{prop_id}` has been permanently deleted.",
+        parse_mode='Markdown'
+    )
+@handle_exceptions
+@ensure_user_data
+async def delete_property_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancels the delete action and restores the original message."""
+    query = update.callback_query
+    await query.answer()
+    prop_id = query.data.split('_')[-1]
+    user = context.user_data['user']
+
+    prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
+    prop = await prop_cases.get_property_details(prop_id)
+    
+    prop_details_card = create_property_card_text(prop, for_admin=True)
+    management_keyboard = keyboards.create_admin_management_keyboard(prop.pid, lang=user.language)
+
+    await query.edit_message_text(
+        text=prop_details_card,
+        parse_mode='Markdown',
+        reply_markup=management_keyboard
+    )
+
+@handle_exceptions
+@ensure_user_data
+async def view_analytics(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Fetches and displays the property analytics dashboard."""
+    logger.info("Admin requested to view analytics.")
+    prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
+    user = context.user_data['user']
+    
+    analytics_data = await prop_cases.get_analytics_summary()
+    
+    # Calculate total
+    total_properties = sum(analytics_data.values())
+
+    # Format the message
+    dashboard_text = (
+        f"**📊 Real Estate Platform Analytics**\n"
+        f"➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
+        f"**Total Properties:** {total_properties}\n\n"
+        f"**Status Breakdown:**\n"
+        f"- `⏳ Pending:`   {analytics_data.get(PropertyStatus.PENDING, 0)}\n"
+        f"- `✅ Approved:`  {analytics_data.get(PropertyStatus.APPROVED, 0)}\n"
+        f"- `💰 Sold:`       {analytics_data.get(PropertyStatus.SOLD, 0)}\n"
+        f"- `❌ Rejected:`   {analytics_data.get(PropertyStatus.REJECTED, 0)}\n"
+        f"➖➖➖➖➖➖➖➖➖➖➖➖➖"
+    )
+
+    await update.message.reply_text(
+        text=dashboard_text,
+        parse_mode='Markdown',
+        reply_markup=keyboards.get_admin_panel_keyboard(lang=user.language)
+    )

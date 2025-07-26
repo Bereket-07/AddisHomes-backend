@@ -2,6 +2,8 @@ from typing import Optional
 from src.infrastructure.repository.firestore_repo import RealEstateRepository
 from src.domain.models.user_models import User, UserCreate, UserRole
 from src.utils.config import settings
+from src.utils.exceptions import UserNotFoundError
+from src.utils.i18n import translations
 
 class UserUseCases:
     def __init__(self, repo: RealEstateRepository):
@@ -62,14 +64,19 @@ class UserUseCases:
             return admin_user.telegram_id
         return None
 
-    async def add_user_role(self, user_id: str, role: UserRole) -> Optional[User]:
+    async def add_user_role(self, user_id: str, role: UserRole) -> User:
         """Adds a role to a user if they don't already have it."""
         user = await self.repo.get_user_by_id(user_id)
         if not user:
-            return None
+            raise UserNotFoundError(identifier=user_id) # <<< Be explicit on error
         
         if role not in user.roles:
             updated_roles = user.roles + [role]
             return await self.repo.update_user(user_id, {"roles": [r.value for r in updated_roles]})
         
         return user
+    async def set_user_language(self, user_id: str, lang_code: str) -> User:
+        """Sets the user's preferred language."""
+        if lang_code not in translations:
+            lang_code = 'en' # Default to english if invalid code is passed
+        return await self.repo.update_user(user_id, {"language": lang_code})

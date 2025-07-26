@@ -149,7 +149,8 @@ class RealEstateRepository:
 
     async def query_properties(self, filters: PropertyFilter) -> List[Property]:
         try:
-            query = self.properties_collection.where('status', '==', PropertyStatus.APPROVED.value)
+            status_to_query = filters.status.value if filters.status else PropertyStatus.APPROVED.value
+            query = self.properties_collection.where('status', '==', status_to_query)
 
             if filters.property_type:
                 query = query.where('property_type', '==', filters.property_type.value)
@@ -168,3 +169,27 @@ class RealEstateRepository:
             return [Property(**doc.to_dict()) async for doc in docs]
         except GoogleAPICallError as e:
             raise DatabaseError(f"Firestore error while querying properties: {e}")
+    async def delete_property(self, pid: str) -> None:
+        """Permanently deletes a property document from Firestore."""
+        doc_ref = self.properties_collection.document(pid)
+        try:
+            if not (await doc_ref.get()).exists:
+                raise PropertyNotFoundError(identifier=pid)
+            
+            await doc_ref.delete()
+            return
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while deleting property: {e}")
+    async def count_properties_by_status(self) -> dict[PropertyStatus, int]:
+        """Counts all properties grouped by their status using efficient aggregation."""
+        counts = {status: 0 for status in PropertyStatus}
+        try:
+            # We run a separate count query for each status. This is very efficient.
+            for status in PropertyStatus:
+                query = self.properties_collection.where('status', '==', status.value)
+                count_query = query.count()
+                query_result = await count_query.get()
+                counts[status] = query_result[0][0].value
+            return counts
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while counting properties: {e}")

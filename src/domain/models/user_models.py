@@ -8,6 +8,7 @@ class UserBase(BaseModel):
     telegram_id: int
     display_name: Optional[str] = None
     roles: List[UserRole] = Field(default_factory=list)
+    language: str = Field(default="en", description="User's preferred language code (e.g., 'en', 'am')")
 
 class UserCreate(UserBase):
     pass
