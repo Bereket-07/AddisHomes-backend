@@ -31,6 +31,37 @@ ANY_PRICE = "Any Price"
 ANY_REGION = "Any Region"
 ANY_SCHEME = "Any Scheme"
 DONE_UPLOADING_TEXT = "✅ Done Uploading" # For the button
+# --- NEW: Reply Keyboard Special Options ---
+OTHER_OPTION_EN = "Other (Please Specify)"
+OTHER_OPTION_AM = "ሌላ (እባክዎ ይግለፁ)"
+
+# --- NEW CONDO SITES LIST ---
+# We store this here for easy access from keyboards and handlers
+# Format: { "en": "English Name", "am": "Amharic Name" }
+CONDOMINIUM_SITES = [
+    {"en": "Piassa", "am": "ፒያሳ"},
+    {"en": "4 Kilo", "am": "4 ኪሎ"},
+    {"en": "Legehar", "am": "ለገሃር"},
+    {"en": "Kasanchis", "am": "ካዛንቺስ"},
+    {"en": "Wollo Sefer", "am": "ወሎ ሰፈር"},
+    {"en": "Olympia", "am": "ኦሎምፒያ"},
+    {"en": "Bethel", "am": "ቤቴል"},
+    {"en": "Bisrate Gebriel", "am": "ብስራተ ገብርኤል"},
+    {"en": "Gotera", "am": "ጎተራ"},
+    {"en": "Bole", "am": "ቦሌ"},
+    {"en": "Gerji", "am": "ገርጂ"},
+    {"en": "Ayat", "am": "አያት"},
+    {"en": "Summit", "am": "ሰሚት"},
+    {"en": "Kality", "am": "ቃሊቲ"},
+    {"en": "Lebu", "am": "ለቡ"},
+    {"en": "Jemo", "am": "ጀሞ"},
+    {"en": "Koye Feche", "am": "ኮዬ ፈጬ"},
+    {"en": "Bulbula", "am": "ቡልቡላ"},
+    {"en": "CMC", "am": "ሲኤምሲ"},
+    {"en": "Asko", "am": "አስኮ"},
+]
+
+
 
 
 # --- NEW: Regex for numeric button choices ---
@@ -43,6 +74,7 @@ NUMERIC_CHOICE_REGEX = r"^\d+(\+)?( .*)?$" # Matches "1", "6+", "0 (Ground)"
     STATE_SUBMIT_PROP_TYPE, 
     STATE_SUBMIT_LOCATION_SUB_CITY,
     STATE_SUBMIT_SPECIFIC_AREA,
+    STATE_SUBMIT_OTHER_AREA,
     STATE_SUBMIT_BEDROOMS, 
     STATE_SUBMIT_BATHROOMS,
     STATE_SUBMIT_SIZE, 
@@ -54,12 +86,26 @@ NUMERIC_CHOICE_REGEX = r"^\d+(\+)?( .*)?$" # Matches "1", "6+", "0 (Ground)"
     STATE_SUBMIT_PRICE, 
     STATE_SUBMIT_IMAGES, 
     STATE_SUBMIT_DESCRIPTION,
-    
+
+    STATE_SUBMIT_IS_COMMERCIAL,
+    STATE_SUBMIT_TOTAL_FLOORS,
+    STATE_SUBMIT_TOTAL_UNITS,
+    STATE_SUBMIT_HAS_ELEVATOR,
+    STATE_SUBMIT_HAS_ROOFTOP,
+    STATE_SUBMIT_IS_TWO_STORY,
+    STATE_SUBMIT_HAS_ENTRANCE,
+        
     # Filtering states
     STATE_FILTER_PROP_TYPE, STATE_FILTER_BEDROOMS, STATE_FILTER_LOCATION_REGION,
     STATE_FILTER_LOCATION_CITY, STATE_FILTER_PRICE_RANGE, STATE_FILTER_SHOW_RESULTS,
     STATE_FILTER_CONDO_SCHEME,STATE_FILTER_VILLA_STRUCTURE,
+    STATE_FILTER_IS_COMMERCIAL,
+    STATE_FILTER_HAS_ELEVATOR,
+    STATE_FILTER_HAS_ROOFTOP,
+    STATE_FILTER_IS_TWO_STORY,
+    STATE_FILTER_HAS_ENTRANCE,
+    STATE_FILTER_SPECIFIC_AREA,
 
     # Admin state
     STATE_ADMIN_REJECT_REASON_INPUT
-) = range(24)
+) = range(38)

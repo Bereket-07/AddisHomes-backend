@@ -1,96 +1,115 @@
-# src/infrastructure/telegram_bot/display_utils.py
-
-from src.domain.models.property_models import Property, PropertyType, PropertyStatus
+from src.domain.models.property_models import Property, PropertyType
 from src.utils.config import settings
+from telegram.helpers import escape_markdown
 
 def create_property_card_text(prop: Property, for_admin: bool = False, for_broker: bool = False) -> str:
     """
     Generates a beautifully formatted, detailed text card for a given property.
+    (This version is fully corrected to use escaped variables)
     """
-    
-    # Emoji mapping for property types
     type_emojis = {
         PropertyType.APARTMENT: "🏢",
         PropertyType.CONDOMINIUM: "🏙️",
         PropertyType.VILLA: "🏡",
+        PropertyType.BUILDING: "🏭",
+        PropertyType.PENTHOUSE: "🌟",
+        PropertyType.DUPLEX: "🏘️",
     }
     header_emoji = type_emojis.get(prop.property_type, "🏠")
 
-    # --- Card Header ---
-    if for_admin:
-        header = f"**{header_emoji} Property Review: {prop.property_type.value}**"
-    elif for_broker:
-        header = f"**{header_emoji} Your Listing: {prop.property_type.value}**"
-    else:
-        header = f"**{header_emoji} {prop.property_type.value} in {prop.location.city}**"
+    # --- Escaped Variables ---
+    # Define them once, and use them throughout the function.
+    property_type_val = escape_markdown(prop.property_type.value)
+    city = escape_markdown(prop.location.city)
+    region = escape_markdown(prop.location.region)
+    sub_city = escape_markdown(prop.location.sub_city) if prop.location.sub_city else ""
 
-    # --- Build details list, omitting empty fields ---
+    # --- Header Construction (FIXED) ---
+    if for_admin:
+        header = f"**{header_emoji} Property Review: {property_type_val}**"
+    elif for_broker:
+        header = f"**{header_emoji} Your Listing: {property_type_val}**"
+    else:
+        header = f"**{header_emoji} {property_type_val} in {city}**"
+
     details_list = []
     details_list.append(f"**💰 Price:** {prop.price_etb:,.2f} ETB")
-    
-    location_str = f"{prop.location.region} - {prop.location.city}"
-    if prop.location.sub_city:
-        location_str += f" - {prop.location.sub_city}"
+
+    # --- Location String Construction (FIXED) ---
+    location_str = f"{region} - {city}"
+    if sub_city:
+        location_str += f" - {sub_city}"
     details_list.append(f"**📍 Location:** {location_str}")
-    
+
     details_list.append(f"**📐 Size:** {prop.size_sqm} m²")
-    details_list.append(f"**🛏️ Bedrooms:** {prop.bedrooms}")
-    details_list.append(f"**🛁 Bathrooms:** {prop.bathrooms}")
+    
+    if prop.property_type != PropertyType.BUILDING:
+        details_list.append(f"**🛏️ Bedrooms:** {prop.bedrooms}")
+        details_list.append(f"**🛁 Bathrooms:** {prop.bathrooms}")
 
     if prop.floor_level is not None:
         if prop.property_type == PropertyType.VILLA:
-            # Display as G+ for villas
             details_list.append(f"**🧗 Structure:** G+{prop.floor_level}")
-        else:
-            # Display as Floor Level for others
+        elif prop.property_type not in [PropertyType.BUILDING, PropertyType.DUPLEX]:
             details_list.append(f"**🧗 Floor Level:** {prop.floor_level}")
+
+    # --- Optional Details (FIXED) ---
     if prop.furnishing_status:
-        details_list.append(f"**🛋️ Furnishing:** {prop.furnishing_status.value}")
+        details_list.append(f"**🛋️ Furnishing:** {escape_markdown(prop.furnishing_status.value)}")
     if prop.parking_spaces is not None:
         details_list.append(f"**🚗 Parking:** {prop.parking_spaces}")
-
-    # Conditional display for Condo Scheme
     if prop.property_type == PropertyType.CONDOMINIUM and prop.condominium_scheme:
-        details_list.append(f"** схеме:** {prop.condominium_scheme.value}")
+        details_list.append(f"** схеме:** {escape_markdown(prop.condominium_scheme.value)}")
 
-    details_list.append(f"**📜 Title Deed:** {'✅ Yes' if prop.title_deed else '❌ No'}")
+    if prop.property_type == PropertyType.BUILDING:
+        if prop.is_commercial is not None:
+            details_list.append(f"**Usage:** {'Commercial' if prop.is_commercial else 'Residential/Mixed'}")
+        if prop.total_floors is not None:
+            details_list.append(f"**Total Floors:** {prop.total_floors}")
+        if prop.total_units is not None:
+            details_list.append(f"**Total Units:** {prop.total_units}")
+        if prop.has_elevator is not None:
+            details_list.append(f"**Elevator:** {'✅ Yes' if prop.has_elevator else '❌ No'}")
+
+    if prop.property_type == PropertyType.PENTHOUSE:
+        if prop.has_private_rooftop is not None:
+            details_list.append(f"**Private Rooftop:** {'✅ Yes' if prop.has_private_rooftop else '❌ No'}")
+        if prop.is_two_story_penthouse is not None:
+            details_list.append(f"**Two Story:** {'✅ Yes' if prop.is_two_story_penthouse else '❌ No'}")
+
+    if prop.property_type == PropertyType.DUPLEX:
+        if prop.has_private_entrance is not None:
+            details_list.append(f"**Private Entrance:** {'✅ Yes' if prop.has_private_entrance else '❌ No'}")
     
-    # --- Description ---
-    description = f"\n**📝 Description:**\n_{prop.description}_"
+    details_list.append(f"**📜 Title Deed:** {'✅ Yes' if prop.title_deed else '❌ No'}")
 
-    # --- Conditional Sections ---
+    # --- Description (Correct from before) ---
+    escaped_description = escape_markdown(prop.description)
+    description = f"\n**📝 Description:**\n_{escaped_description}_"
+    
+    # --- Extra Info (FIXED) ---
     extra_info = ""
     if for_admin:
-        extra_info = (
-            f"\n\n---\n**Admin Info:**\n"
-            f"**Property ID:** `{prop.pid}`\n"
-            f"**Current Status:** {prop.status.value.title()}\n"
-            f"**Broker:** {prop.broker_name} (`{prop.broker_id}`)"
-        )
+        extra_info = (f"\n\n---\n**Admin Info:**\n"
+                      f"**Property ID:** `{prop.pid}`\n"
+                      f"**Current Status:** {escape_markdown(prop.status.value.title())}\n"
+                      f"**Broker:** {escape_markdown(prop.broker_name)} (`{prop.broker_id}`)")
     elif for_broker:
-        rejection_reason = f"\n**Reason:** {prop.rejection_reason}" if prop.rejection_reason else ""
-        extra_info = (
-            f"\n\n---\n**Listing Status: {prop.status.value.upper()}**"
-            f"{rejection_reason}"
-        )
-    else: # For Buyer
+        rejection_reason = f"\n**Reason:** {escape_markdown(prop.rejection_reason)}" if prop.rejection_reason else ""
+        extra_info = (f"\n\n---\n**Listing Status: {escape_markdown(prop.status.value.upper())}**"
+                      f"{rejection_reason}")
+    else:
         phone = settings.ADMIN_PHONE_NUMBER
-        telegram = settings.ADMIN_TG_USERNAME
-        
-        extra_info = (
-            f"\n\n---\n"
-            f"**Interested in this property? Contact the agent:**\n"
-            f"**📞 Phone:** `{phone}`\n"
-            f"**💬 Telegram:** {telegram}"
-        )
+        # Escape the username just in case it contains underscores or other special chars
+        telegram = escape_markdown(settings.ADMIN_TG_USERNAME)
+        extra_info = (f"\n\n---\n"
+                      f"**Interested in this property? Contact the agent:**\n"
+                      f"**📞 Phone:** `{phone}`\n"
+                      f"**💬 Telegram:** {telegram}")
 
-    # --- Assemble the Final Card ---
-    card_text = (
-        f"{header}\n"
-        f"➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
-        f"{'\n'.join(details_list)}"  # Join the list of details
-        f"{description}"
-        f"{extra_info}"
-    )
-
+    card_text = (f"{header}\n"
+                 f"➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
+                 f"{'\n'.join(details_list)}\n"
+                 f"{description}"
+                 f"{extra_info}")
     return card_text

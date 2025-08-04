@@ -165,6 +165,16 @@ class RealEstateRepository:
                 query = query.where(filter=FieldFilter('price_etb', '>=', filters.min_price))
             if filters.max_price:
                 query = query.where(filter=FieldFilter('price_etb', '<=', filters.max_price))
+            if filters.filter_is_commercial is not None:
+                query = query.where('is_commercial', '==', filters.filter_is_commercial)
+            if filters.filter_has_elevator is not None:
+                query = query.where('has_elevator', '==', filters.filter_has_elevator)
+            if filters.filter_has_private_rooftop is not None:
+                query = query.where('has_private_rooftop', '==', filters.filter_has_private_rooftop)
+            if filters.filter_is_two_story_penthouse is not None:
+                query = query.where('is_two_story_penthouse', '==', filters.filter_is_two_story_penthouse)
+            if filters.filter_has_private_entrance is not None:
+                query = query.where('has_private_entrance', '==', filters.filter_has_private_entrance)
             if filters.min_floor_level is not None:
                 # Firestore does not support inequality filters on multiple fields.
                 # Since we likely already filter on price or bedrooms, we cannot

@@ -85,6 +85,22 @@ translations = {
         # Notifications
         'property_approved_notification': "Your property submission has been approved and is now live!",
         'property_rejected_notification': "Your property submission was rejected. Reason: {reason}",
+
+
+        'is_commercial': "Is it a commercial or mixed-use building?",
+        'total_floors': "How many floors does the building have?",
+        'total_units': "How many total units (apartments/offices) are in the building?",
+        'has_elevator': "Does the building have an elevator?",
+        'has_private_rooftop': "Does the penthouse have a private rooftop terrace?",
+        'is_two_story_penthouse': "Is it a two-story (duplex) penthouse?",
+        'has_private_entrance': "Does the duplex have a private entrance?",
+
+        # Filter prompts
+        'ask_filter_is_commercial': "Show only commercial buildings?",
+        'ask_filter_has_elevator': "Must have an elevator?",
+        'ask_filter_has_rooftop': "Must have a private rooftop?",
+        'ask_filter_is_two_story': "Show only two-story penthouses?",
+        'ask_filter_has_entrance': "Must have a private entrance?",
     },
     'am': {
         # General & Main Menu
@@ -169,6 +185,22 @@ translations = {
         # Notifications
         'property_approved_notification': "ያስገቡት ንብረት ጸድቆ ገበያ ላይ ውሏል!",
         'property_rejected_notification': "ያስገቡት ንብረት ውድቅ ተደርጓል። ምክንያት: {reason}",
+
+
+        'is_commercial': "ሕንፃው ለንግድ ወይስ ለተቀላቀለ አገልግሎት ነው?",
+        'total_floors': "ሕንፃው ስንት ፎቆች አሉት?",
+        'total_units': "ሕንፃው በድምሩ ስንት ክፍሎች (አፓርታማዎች/ቢሮዎች) አሉት?",
+        'has_elevator': "ሕንፃው ሊፍት (አሳንሰር) አለው?",
+        'has_private_rooftop': "ፔንትሃውሱ የግል የጣራ ላይ እርከን አለው?",
+        'is_two_story_penthouse': "ባለ ሁለት ፎቅ (ዱፕሌክስ) ፔንትሃውስ ነው?",
+        'has_private_entrance': "ዱፕሌክሱ የግል መግቢያ በር አለው?",
+        
+        # Filter prompts
+        'ask_filter_is_commercial': "የንግድ ሕንፃዎችን ብቻ አሳይ?",
+        'ask_filter_has_elevator': "ሊፍት የግድ ሊኖረው ይገባል?",
+        'ask_filter_has_rooftop': "የግል ጣራ የግድ ሊኖረው ይገባል?",
+        'ask_filter_is_two_story': "ባለ ሁለት ፎቅ ፔንትሃውሶችን ብቻ አሳይ?",
+        'ask_filter_has_entrance': "የግል መግቢያ የግድ ሊኖረው ይገባል?",
     }
 }
 

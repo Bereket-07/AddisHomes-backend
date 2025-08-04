@@ -23,28 +23,42 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     submission_conv = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex(create_i18n_regex('submit_property')), broker_handlers.start_submission)],
         states={
-            STATE_SUBMIT_PROP_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_property_type)],
-            STATE_SUBMIT_LOCATION_SUB_CITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_sub_city)],
-            STATE_SUBMIT_SPECIFIC_AREA: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_specific_area)],
-            STATE_SUBMIT_BEDROOMS: [MessageHandler(filters.Regex(NUMERIC_CHOICE_REGEX), broker_handlers.receive_bedrooms)],
-            STATE_SUBMIT_BATHROOMS: [MessageHandler(filters.Regex(NUMERIC_CHOICE_REGEX), broker_handlers.receive_bathrooms)],
+            STATE_SUBMIT_PROP_TYPE: [MessageHandler(filters.TEXT, broker_handlers.receive_property_type)],
+            STATE_SUBMIT_LOCATION_SUB_CITY: [MessageHandler(filters.TEXT, broker_handlers.receive_sub_city)],
+            STATE_SUBMIT_SPECIFIC_AREA: [MessageHandler(filters.TEXT, broker_handlers.receive_specific_area)],
             
-            # --- START: MINIMAL FIX ---
-            STATE_SUBMIT_SIZE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_size)],
-            # --- END: MINIMAL FIX ---
+            # Branching Point
+            STATE_SUBMIT_BEDROOMS: [MessageHandler(filters.TEXT, broker_handlers.receive_bedrooms)],
+            STATE_SUBMIT_BATHROOMS: [MessageHandler(filters.TEXT, broker_handlers.receive_bathrooms)],
 
-            STATE_SUBMIT_FLOOR_LEVEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_floor_level)], # Note: This will likely be the next error.
-            STATE_SUBMIT_PARKING_SPACES: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_parking_spaces)], # Note: Changed Regex to TEXT to match receive_parking_spaces
-            STATE_SUBMIT_FURNISHING_STATUS: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_furnishing_status)],
-            STATE_SUBMIT_TITLE_DEED: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_title_deed)],
+            # Building Flow
+            STATE_SUBMIT_IS_COMMERCIAL: [MessageHandler(filters.TEXT, broker_handlers.receive_is_commercial)],
+            STATE_SUBMIT_TOTAL_FLOORS: [MessageHandler(filters.TEXT, broker_handlers.receive_total_floors)],
+            STATE_SUBMIT_TOTAL_UNITS: [MessageHandler(filters.TEXT, broker_handlers.receive_total_units)],
+            STATE_SUBMIT_HAS_ELEVATOR: [MessageHandler(filters.TEXT, broker_handlers.receive_has_elevator)],
+
+            # Common Flow
+            STATE_SUBMIT_SIZE: [MessageHandler(filters.TEXT, broker_handlers.receive_size)],
+            STATE_SUBMIT_FLOOR_LEVEL: [MessageHandler(filters.TEXT, broker_handlers.receive_floor_level)],
+            STATE_SUBMIT_FURNISHING_STATUS: [MessageHandler(filters.TEXT, broker_handlers.receive_furnishing_status)],
             
-            STATE_SUBMIT_CONDO_SCHEME: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_condo_scheme)],
-            STATE_SUBMIT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_price)],
+            # Penthouse Flow
+            STATE_SUBMIT_HAS_ROOFTOP: [MessageHandler(filters.TEXT, broker_handlers.receive_has_rooftop)],
+            STATE_SUBMIT_IS_TWO_STORY: [MessageHandler(filters.TEXT, broker_handlers.receive_is_two_story)],
+
+            # Duplex Flow
+            STATE_SUBMIT_HAS_ENTRANCE: [MessageHandler(filters.TEXT, broker_handlers.receive_has_entrance)],
+
+            # Final Common Flow
+            STATE_SUBMIT_TITLE_DEED: [MessageHandler(filters.TEXT, broker_handlers.receive_title_deed)],
+            STATE_SUBMIT_PARKING_SPACES: [MessageHandler(filters.TEXT, broker_handlers.receive_parking_spaces)],
+            STATE_SUBMIT_CONDO_SCHEME: [MessageHandler(filters.TEXT, broker_handlers.receive_condo_scheme)],
+            STATE_SUBMIT_PRICE: [MessageHandler(filters.TEXT, broker_handlers.receive_price)],
             STATE_SUBMIT_IMAGES: [
                 MessageHandler(filters.PHOTO, broker_handlers.receive_images),
-                MessageHandler(filters.Regex(f"^{DONE_UPLOADING_TEXT}$"), broker_handlers.done_receiving_images), # Note: Changed filters.Text to filters.Regex
+                MessageHandler(filters.Regex(f"^{DONE_UPLOADING_TEXT}$"), broker_handlers.done_receiving_images),
             ],
-            STATE_SUBMIT_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, broker_handlers.receive_description)],
+            STATE_SUBMIT_DESCRIPTION: [MessageHandler(filters.TEXT, broker_handlers.receive_description)],
         },
         fallbacks=[MessageHandler(filters.Regex(create_i18n_regex('cancel')), common_handlers.cancel_conversation)],
         per_message=False
@@ -54,25 +68,22 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     filter_conv = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex(create_i18n_regex('filter_properties')), buyer_handlers.start_filtering)],
         states={
-            # We will add ~filters.Regex(create_i18n_regex('cancel')) to each state's filter
-            STATE_FILTER_PROP_TYPE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_prop_type)
-            ],
-            STATE_FILTER_BEDROOMS: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_bedrooms)
-            ],
-            STATE_FILTER_VILLA_STRUCTURE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_villa_structure)
-            ],
-            STATE_FILTER_LOCATION_REGION: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_region)
-            ],
-            STATE_FILTER_PRICE_RANGE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_price_range)
-            ],
-            STATE_FILTER_CONDO_SCHEME: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(create_i18n_regex('cancel')), buyer_handlers.receive_filter_condo_scheme)
-            ],
+            # Branching Point
+            STATE_FILTER_PROP_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_prop_type)],
+            
+            # Special Type Flows
+            STATE_FILTER_CONDO_SCHEME: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_condo_scheme)],
+            STATE_FILTER_IS_COMMERCIAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_is_commercial)],
+            STATE_FILTER_HAS_ELEVATOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_has_elevator)],
+            STATE_FILTER_HAS_ROOFTOP: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_has_rooftop)],
+            STATE_FILTER_IS_TWO_STORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_is_two_story)],
+            STATE_FILTER_HAS_ENTRANCE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_has_entrance)],
+            
+            # Common Flow
+            STATE_FILTER_PRICE_RANGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_price_range)],
+            STATE_FILTER_LOCATION_REGION: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_region)],
+            STATE_FILTER_VILLA_STRUCTURE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_villa_structure)],
+            STATE_FILTER_BEDROOMS: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_bedrooms)],
         },
         fallbacks=[MessageHandler(filters.Regex(create_i18n_regex('cancel')), common_handlers.cancel_conversation)],
         per_message=False

@@ -26,6 +26,20 @@ class PropertyBase(BaseModel):
     water_tank: bool = False
     parking_spaces: Optional[int] = 0
 
+    # --- NEW ATTRIBUTES FOR NEW PROPERTY TYPES ---
+    # For Building
+    is_commercial: Optional[bool] = None
+    total_floors: Optional[int] = None
+    total_units: Optional[int] = None # e.g., number of apartments or offices
+    has_elevator: Optional[bool] = None
+    
+    # For Penthouse
+    has_private_rooftop: Optional[bool] = None
+    is_two_story_penthouse: Optional[bool] = None # i.e., a duplex penthouse
+
+    # For Duplex
+    has_private_entrance: Optional[bool] = None
+
 class PropertyCreate(PropertyBase):
     broker_id: str
     broker_name: str
@@ -56,3 +70,8 @@ class PropertyFilter(BaseModel):
     condominium_scheme: Optional[CondoScheme] = None
     furnishing_status: Optional[FurnishingStatus] = None
     min_floor_level: Optional[int] = None
+    filter_is_commercial: Optional[bool] = None
+    filter_has_elevator: Optional[bool] = None
+    filter_has_private_rooftop: Optional[bool] = None
+    filter_is_two_story_penthouse: Optional[bool] = None
+    filter_has_private_entrance: Optional[bool] = None

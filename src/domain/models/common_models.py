@@ -11,6 +11,9 @@ class PropertyType(str, Enum):
     APARTMENT = "Apartment"
     CONDOMINIUM = "Condominium"
     VILLA = "Villa"
+    BUILDING = "Building"          # <<< NEW
+    PENTHOUSE = "Penthouse"        # <<< NEW
+    DUPLEX = "Duplex"              # <<< NEW
 
 class PropertyStatus(str, Enum):
     PENDING = "pending"

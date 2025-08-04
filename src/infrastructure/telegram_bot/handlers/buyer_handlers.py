@@ -79,7 +79,7 @@ async def start_filtering(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
     return STATE_FILTER_PROP_TYPE
 
-# STEP 1: Receive Property Type, then ask for Scheme (if Condo) or Price (if not)
+# STEP 1: Receive Property Type, then branch
 @handle_exceptions
 @ensure_user_data
 async def receive_filter_prop_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -87,144 +87,149 @@ async def receive_filter_prop_type(update: Update, context: ContextTypes.DEFAULT
     context.user_data['filters']['property_type'] = prop_type
     user: User = context.user_data['user']
     
+    # --- BRANCHING LOGIC ---
     if prop_type == PropertyType.CONDOMINIUM:
-        await update.message.reply_text(
-            text=t('select_condo_scheme', lang=user.language),
-            reply_markup=keyboards.get_condo_scheme_keyboard(is_filter=True, lang=user.language)
-        )
+        await update.message.reply_text(t('select_condo_scheme', lang=user.language), reply_markup=keyboards.get_condo_scheme_keyboard(is_filter=True, lang=user.language))
         return STATE_FILTER_CONDO_SCHEME
-    else:
-        await update.message.reply_text(
-            text=t('select_price_range', lang=user.language),
-            reply_markup=keyboards.get_price_range_keyboard(lang=user.language)
-        )
+    elif prop_type == PropertyType.BUILDING:
+        await update.message.reply_text(t('ask_filter_is_commercial', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
+        return STATE_FILTER_IS_COMMERCIAL
+    elif prop_type == PropertyType.PENTHOUSE:
+        await update.message.reply_text(t('ask_filter_has_rooftop', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
+        return STATE_FILTER_HAS_ROOFTOP
+    elif prop_type == PropertyType.DUPLEX:
+        await update.message.reply_text(t('ask_filter_has_entrance', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
+        return STATE_FILTER_HAS_ENTRANCE
+    else: # Apartment, Villa, etc. go to the price range
+        await update.message.reply_text(t('select_price_range', lang=user.language), reply_markup=keyboards.get_price_range_keyboard(lang=user.language))
         return STATE_FILTER_PRICE_RANGE
+# === BUILDING FILTER FLOW ===
+@handle_exceptions
+@ensure_user_data
+async def receive_filter_is_commercial(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user: User = context.user_data['user']
+    context.user_data['filters']['filter_is_commercial'] = (update.message.text.lower() == t('yes', lang=user.language).lower())
+    await update.message.reply_text(t('ask_filter_has_elevator', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
+    return STATE_FILTER_HAS_ELEVATOR
 
-# STEP 2 (Conditional): Receive Condo Scheme, then ask for Price
+@handle_exceptions
+@ensure_user_data
+async def receive_filter_has_elevator(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user: User = context.user_data['user']
+    context.user_data['filters']['filter_has_elevator'] = (update.message.text.lower() == t('yes', lang=user.language).lower())
+    # Merge back to the main flow
+    await update.message.reply_text(t('select_price_range', lang=user.language), reply_markup=keyboards.get_price_range_keyboard(lang=user.language))
+    return STATE_FILTER_PRICE_RANGE
+
+# === PENTHOUSE FILTER FLOW ===
+@handle_exceptions
+@ensure_user_data
+async def receive_filter_has_rooftop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user: User = context.user_data['user']
+    context.user_data['filters']['filter_has_private_rooftop'] = (update.message.text.lower() == t('yes', lang=user.language).lower())
+    await update.message.reply_text(t('ask_filter_is_two_story', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
+    return STATE_FILTER_IS_TWO_STORY
+
+@handle_exceptions
+@ensure_user_data
+async def receive_filter_is_two_story(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user: User = context.user_data['user']
+    context.user_data['filters']['filter_is_two_story_penthouse'] = (update.message.text.lower() == t('yes', lang=user.language).lower())
+    # Merge back to the main flow
+    await update.message.reply_text(t('select_price_range', lang=user.language), reply_markup=keyboards.get_price_range_keyboard(lang=user.language))
+    return STATE_FILTER_PRICE_RANGE
+
+# === DUPLEX FILTER FLOW ===
+@handle_exceptions
+@ensure_user_data
+async def receive_filter_has_entrance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user: User = context.user_data['user']
+    context.user_data['filters']['filter_has_private_entrance'] = (update.message.text.lower() == t('yes', lang=user.language).lower())
+    # Merge back to the main flow
+    await update.message.reply_text(t('select_price_range', lang=user.language), reply_markup=keyboards.get_price_range_keyboard(lang=user.language))
+    return STATE_FILTER_PRICE_RANGE
+
+# === COMMON FLOW ===
 @handle_exceptions
 @ensure_user_data
 async def receive_filter_condo_scheme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    scheme_text = update.message.text
     user: User = context.user_data['user']
-    if scheme_text != t('any_scheme', lang=user.language):
-        context.user_data['filters']['condominium_scheme'] = CondoScheme(scheme_text)
-            
-    await update.message.reply_text(
-        text=t('select_price_range', lang=user.language),
-        reply_markup=keyboards.get_price_range_keyboard(lang=user.language)
-    )
+    if update.message.text != t('any_scheme', lang=user.language):
+        context.user_data['filters']['condominium_scheme'] = CondoScheme(update.message.text)
+    await update.message.reply_text(t('select_price_range', lang=user.language), reply_markup=keyboards.get_price_range_keyboard(lang=user.language))
     return STATE_FILTER_PRICE_RANGE
 
-# STEP 3: Receive Price Range, then ask for Region
 @handle_exceptions
 @ensure_user_data
 async def receive_filter_price_range(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    price_text = update.message.text
     user: User = context.user_data['user']
-    if price_text != t('any_price', lang=user.language):
-        # This assumes PRICE_RANGES_TEXT keys are not translated. If they are, this logic needs adjustment.
-        price_value = keyboards.PRICE_RANGES_TEXT.get(price_text)
+    if update.message.text != t('any_price', lang=user.language):
+        price_value = keyboards.PRICE_RANGES_TEXT.get(update.message.text)
         if price_value:
             price_range = price_value.split('-')
             context.user_data['filters']['min_price'] = float(price_range[0])
             context.user_data['filters']['max_price'] = float(price_range[1])
-    
-    await update.message.reply_text(
-        text=t('select_region', lang=user.language),
-        reply_markup=keyboards.get_region_keyboard(is_filter=True, lang=user.language)
-    )
+    await update.message.reply_text(t('select_region', lang=user.language), reply_markup=keyboards.get_region_keyboard(is_filter=True, lang=user.language))
     return STATE_FILTER_LOCATION_REGION
 
-# STEP 4: Receive Region, then ask for Bedrooms
 @handle_exceptions
 @ensure_user_data
 async def receive_filter_region(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    region_text = update.message.text
     user: User = context.user_data['user']
-    
-    if region_text != t('any_region', lang=user.language):
-        context.user_data['filters']['location_region'] = region_text
-
-    # --- MODIFIED LOGIC ---
+    if update.message.text != t('any_region', lang=user.language):
+        context.user_data['filters']['location_region'] = update.message.text
+        
     prop_type = context.user_data['filters'].get('property_type')
-    
     if prop_type == PropertyType.VILLA:
-        # If it's a villa, ask for G+ structure
-        await update.message.reply_text(
-            text=t('what_is_g_plus', lang=user.language),
-            reply_markup=keyboards.get_g_plus_keyboard(is_filter=True, lang=user.language)
-        )
+        await update.message.reply_text(t('what_is_g_plus', lang=user.language), reply_markup=keyboards.get_g_plus_keyboard(is_filter=True, lang=user.language))
         return STATE_FILTER_VILLA_STRUCTURE
+    elif prop_type == PropertyType.BUILDING:
+        # Buildings have no bedrooms, so we end the conversation here
+        return await end_filter_conversation(update, context)
     else:
-        # For all other types, go to bedrooms
-        await update.message.reply_text(
-            text=t('how_many_bedrooms', lang=user.language),
-            reply_markup=keyboards.get_bedroom_keyboard(is_filter=True, lang=user.language)
-        )
+        await update.message.reply_text(t('how_many_bedrooms', lang=user.language), reply_markup=keyboards.get_bedroom_keyboard(is_filter=True, lang=user.language))
         return STATE_FILTER_BEDROOMS
-    # --- END MODIFIED LOGIC ---
 
-# --- NEW HANDLER FOR VILLA STRUCTURE FILTER ---
-# STEP 4.5 (Conditional): Receive Villa Structure, then ask for Bedrooms
 @handle_exceptions
 @ensure_user_data
 async def receive_filter_villa_structure(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user: User = context.user_data['user']
-    user_input = update.message.text.strip()
-    
-    if user_input != t('any_option', lang=user.language):
-        # We will filter for "greater than or equal to"
-        # "G+2" means we search for G+2, G+3, etc.
-        numeric_part = user_input.upper().replace("G+", "").replace("+", "")
+    if update.message.text != t('any_option', lang=user.language):
+        numeric_part = update.message.text.upper().replace("G+", "").replace("+", "")
         try:
-            # We don't have a specific filter for floor_level, so this will be a post-filter step.
-            # For now, let's just store it. We'll add the actual filtering logic in firestore_repo.py
             context.user_data['filters']['min_floor_level'] = int(numeric_part)
         except (ValueError, TypeError):
-            pass # Ignore if input is invalid, effectively treating it as "Any"
-            
-    # Now ask for bedrooms
-    await update.message.reply_text(
-        text=t('how_many_bedrooms', lang=user.language),
-        reply_markup=keyboards.get_bedroom_keyboard(is_filter=True, lang=user.language)
-    )
+            pass
+    await update.message.reply_text(t('how_many_bedrooms', lang=user.language), reply_markup=keyboards.get_bedroom_keyboard(is_filter=True, lang=user.language))
     return STATE_FILTER_BEDROOMS
 
-# STEP 5 (FINAL): Receive Bedrooms, show results, AND send the final menu
 @handle_exceptions
 @ensure_user_data
 async def receive_filter_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    bedrooms_text = update.message.text
     user: User = context.user_data['user']
-    if bedrooms_text != t('any_option', lang=user.language):
-        min_bedrooms = int(bedrooms_text.replace('+', ''))
+    if update.message.text != t('any_option', lang=user.language):
+        min_bedrooms = int(update.message.text.replace('+', ''))
         context.user_data['filters']['min_bedrooms'] = min_bedrooms
-    
-    # Build the filters from all collected data
+    return await end_filter_conversation(update, context)
+
+async def end_filter_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Helper function to finalize the filtering conversation."""
+    user: User = context.user_data['user']
     final_filters = PropertyFilter(**context.user_data['filters'])
-    
-    # Call the helper to display the properties
     await show_properties(update, context, final_filters)
-    
-    # After showing properties, send a final confirmation message WITH the main menu
     await update.message.reply_text(
-        text=t('search_complete', lang=user.language, default="Search complete. Returning to the main menu."),
+        text=t('search_complete', lang=user.language),
         reply_markup=keyboards.get_main_menu_keyboard(user)
     )
-    
-    # Clean up and end the conversation
     context.user_data.pop('filters', None)
     return ConversationHandler.END
-
 
 @handle_exceptions
 @ensure_user_data
 async def browse_all_properties(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler for browsing all properties without filters."""
-    # We can reuse the final logic from the conversation for a consistent experience
     await show_properties(update, context, PropertyFilter())
     user = context.user_data.get('user')
     await update.message.reply_text(
-        text=t('browse_complete', lang=user.language, default="Browse complete. Returning to the main menu."),
+        text=t('browse_complete', lang=user.language),
         reply_markup=keyboards.get_main_menu_keyboard(user)
     )
