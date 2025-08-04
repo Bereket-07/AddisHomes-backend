@@ -24,8 +24,9 @@ class PropertyStatus(str, Enum):
 class Location(BaseModel):
     region: str
     city: str
-    sub_city: Optional[str] = None
-    specific_area: Optional[str] = None
+    # sub_city: Optional[str] = None
+    # specific_area: Optional[str] = None
+    site: Optional[str] = None
 
 class CondoScheme(str, Enum):
     S20_80 = "20/80"

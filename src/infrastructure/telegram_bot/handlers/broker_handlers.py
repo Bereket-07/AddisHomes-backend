@@ -28,61 +28,100 @@ async def start_submission(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 @handle_exceptions
 @ensure_user_data
 async def receive_property_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['submission_data']['property_type'] = PropertyType(update.message.text)
+    # --- UPDATED ---
+    prop_type = PropertyType(update.message.text)
+    context.user_data['submission_data']['property_type'] = prop_type
     # For now, we assume Addis Ababa. This could be a question itself.
     context.user_data['submission_data']['location'] = {'region': 'Addis Ababa', 'city': 'Addis Ababa'}
     user: User = context.user_data['user']
-    await update.message.reply_text(
-        t('select_sub_city', lang=user.language, default="In which Sub-city is the property located?"),
-        reply_markup=keyboards.get_sub_city_keyboard(lang=user.language)
-    )
-    return STATE_SUBMIT_LOCATION_SUB_CITY
 
-@handle_exceptions
-@ensure_user_data
-async def receive_sub_city(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    sub_city = update.message.text
-    context.user_data['submission_data']['location']['sub_city'] = sub_city
-    user: User = context.user_data['user']
-    
-    prop_type = context.user_data['submission_data']['property_type']
     if prop_type == PropertyType.CONDOMINIUM:
-        keyboard = keyboards.get_condo_site_keyboard(sub_city, lang=user.language)
-        prompt = t('select_condo_site', lang=user.language, default="Please select the Condominium Site name.")
-    else:
-        keyboard = keyboards.get_neighborhood_keyboard(sub_city, lang=user.language)
-        prompt = t('select_neighborhood', lang=user.language, default="Please select the nearest neighborhood/area.")
-
-    if not keyboard.keyboard:
-        prompt = t('type_specific_area', lang=user.language, default="Could not find specific areas. Please type the specific area name.")
-        keyboard = keyboards.REMOVE_KEYBOARD
+        # For Condos, ask for Scheme first.
+        await update.message.reply_text(
+            t('what_is_condo_scheme', lang=user.language),
+            reply_markup=keyboards.get_condo_scheme_keyboard(lang=user.language)
+        )
+        return STATE_SUBMIT_CONDO_SCHEME
     
-    await update.message.reply_text(prompt, reply_markup=keyboard)
-    return STATE_SUBMIT_SPECIFIC_AREA
-
-@handle_exceptions
-@ensure_user_data
-async def receive_specific_area(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['submission_data']['location']['specific_area'] = update.message.text
-    user: User = context.user_data['user']
-    prop_type = context.user_data['submission_data']['property_type']
-
-    # --- BRANCHING LOGIC ---
-    if prop_type == PropertyType.BUILDING:
-        # Buildings don't have "bedrooms" in the same way. Ask a different question.
+    elif prop_type == PropertyType.APARTMENT:
+        # For Apartments, go directly to Site selection.
+        await update.message.reply_text(
+            t('select_site', lang=user.language, default="Please select the site/area."),
+            reply_markup=keyboards.get_site_keyboard(lang=user.language)
+        )
+        return STATE_SUBMIT_SITE
+    
+    # Existing logic for other property types remains the same
+    elif prop_type == PropertyType.BUILDING:
         await update.message.reply_text(
             t('is_commercial', lang=user.language),
             reply_markup=keyboards.get_boolean_keyboard(lang=user.language)
         )
         return STATE_SUBMIT_IS_COMMERCIAL
     else:
-        # All other types (Apartment, Penthouse, Duplex, Villa, Condo) have bedrooms.
+        # All other types (Villa, Penthouse, Duplex) have bedrooms.
         await update.message.reply_text(
             t('how_many_bedrooms', lang=user.language), 
             reply_markup=keyboards.get_bedroom_keyboard(lang=user.language)
         )
         return STATE_SUBMIT_BEDROOMS
-# === BUILDING SUBMISSION FLOW ===
+
+# --- DEPRECATED receive_sub_city ---
+# --- DEPRECATED receive_specific_area ---
+
+# --- NEW HANDLER for Condo scheme, now early in the flow ---
+@handle_exceptions
+@ensure_user_data
+async def receive_condo_scheme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['submission_data']['condominium_scheme'] = CondoScheme(update.message.text)
+    user: User = context.user_data['user']
+    # After scheme, ask for the site
+    await update.message.reply_text(
+        t('select_site', lang=user.language, default="Great. Now, please select the Condominium's site/area."),
+        reply_markup=keyboards.get_site_keyboard(lang=user.language)
+    )
+    return STATE_SUBMIT_SITE
+
+# --- NEW HANDLER for Site selection ---
+@handle_exceptions
+@ensure_user_data
+async def receive_site(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the site selection and handles the 'Other' option."""
+    user_input = update.message.text
+    user: User = context.user_data['user']
+    other_option_text = t('other_option', lang=user.language, default=OTHER_OPTION_EN)
+
+    if user_input == other_option_text:
+        await update.message.reply_text(
+            t('type_specific_area', lang=user.language),
+            reply_markup=keyboards.REMOVE_KEYBOARD
+        )
+        return STATE_SUBMIT_OTHER_SITE
+    else:
+        # Store the site and move on to bedrooms
+        context.user_data['submission_data']['location']['site'] = user_input
+        await update.message.reply_text(
+            t('how_many_bedrooms', lang=user.language), 
+            reply_markup=keyboards.get_bedroom_keyboard(lang=user.language)
+        )
+        return STATE_SUBMIT_BEDROOMS
+
+# --- NEW HANDLER for "Other" Site input ---
+@handle_exceptions
+@ensure_user_data
+async def receive_other_site(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receives the manually typed site name."""
+    user_input = update.message.text
+    user: User = context.user_data['user']
+    # Store the site and move on to bedrooms
+    context.user_data['submission_data']['location']['site'] = user_input
+    await update.message.reply_text(
+        t('how_many_bedrooms', lang=user.language), 
+        reply_markup=keyboards.get_bedroom_keyboard(lang=user.language)
+    )
+    return STATE_SUBMIT_BEDROOMS
+
+# === BUILDING SUBMISSION FLOW (Unchanged) ===
 @handle_exceptions
 @ensure_user_data
 async def receive_is_commercial(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -97,7 +136,6 @@ async def receive_total_floors(update: Update, context: ContextTypes.DEFAULT_TYP
     user: User = context.user_data['user']
     try:
         context.user_data['submission_data']['total_floors'] = int(update.message.text)
-        # For buildings, "bedrooms" and "bathrooms" can be set to 0 or asked differently. Let's set to 0 for simplicity.
         context.user_data['submission_data']['bedrooms'] = 0
         context.user_data['submission_data']['bathrooms'] = 0
         await update.message.reply_text(t('total_units', lang=user.language), reply_markup=keyboards.REMOVE_KEYBOARD)
@@ -123,14 +161,13 @@ async def receive_total_units(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def receive_has_elevator(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user: User = context.user_data['user']
     context.user_data['submission_data']['has_elevator'] = (update.message.text.lower() == t('yes', lang=user.language).lower())
-    # Building flow now merges back into the common flow at the 'size' question
     await update.message.reply_text(
         t('what_is_size', lang=user.language),
         reply_markup=keyboards.get_size_range_keyboard(lang=user.language)
     )
     return STATE_SUBMIT_SIZE
 
-# === REGULAR RESIDENTIAL FLOW (Bedrooms, Bathrooms) ===
+# === REGULAR RESIDENTIAL FLOW (Unchanged - The new flow merges into this) ===
 @handle_exceptions
 @ensure_user_data
 async def receive_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -169,7 +206,7 @@ async def receive_bathrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return STATE_SUBMIT_BATHROOMS
 
-# === COMMON FLOW (All types merge here) ===
+# === COMMON FLOW (Unchanged) ===
 @handle_exceptions
 @ensure_user_data
 async def receive_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -188,7 +225,6 @@ async def receive_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         keyboard = keyboards.REMOVE_KEYBOARD
         next_state = STATE_SUBMIT_FLOOR_LEVEL
     else: # Building
-        # Buildings have total_floors, so we can skip this and go to furnishing
         prompt = t('what_is_furnishing', lang=user.language)
         keyboard = keyboards.get_furnishing_status_keyboard(lang=user.language)
         next_state = STATE_SUBMIT_FURNISHING_STATUS
@@ -219,7 +255,6 @@ async def receive_floor_level(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(t('invalid_number', lang=user.language))
         return STATE_SUBMIT_FLOOR_LEVEL
 
-# This is where the final branching happens for Penthouse/Duplex specific questions
 @handle_exceptions
 @ensure_user_data
 async def receive_furnishing_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -235,11 +270,10 @@ async def receive_furnishing_status(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text(t('has_private_entrance', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
         return STATE_SUBMIT_HAS_ENTRANCE
     else:
-        # All other types go to Title Deed
         await update.message.reply_text(t('has_title_deed', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
         return STATE_SUBMIT_TITLE_DEED
 
-# === PENTHOUSE FLOW ===
+# === PENTHOUSE FLOW (Unchanged) ===
 @handle_exceptions
 @ensure_user_data
 async def receive_has_rooftop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -253,17 +287,15 @@ async def receive_has_rooftop(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def receive_is_two_story(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user: User = context.user_data['user']
     context.user_data['submission_data']['is_two_story_penthouse'] = (update.message.text.lower() == t('yes', lang=user.language).lower())
-    # Merge back to common flow
     await update.message.reply_text(t('has_title_deed', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
     return STATE_SUBMIT_TITLE_DEED
 
-# === DUPLEX FLOW ===
+# === DUPLEX FLOW (Unchanged) ===
 @handle_exceptions
 @ensure_user_data
 async def receive_has_entrance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user: User = context.user_data['user']
     context.user_data['submission_data']['has_private_entrance'] = (update.message.text.lower() == t('yes', lang=user.language).lower())
-    # Merge back to common flow
     await update.message.reply_text(t('has_title_deed', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
     return STATE_SUBMIT_TITLE_DEED
 
@@ -286,35 +318,17 @@ async def receive_parking_spaces(update: Update, context: ContextTypes.DEFAULT_T
         cleaned_text = update.message.text.replace('+', '')
         context.user_data['submission_data']['parking_spaces'] = int(cleaned_text)
         
-        prop_type = context.user_data['submission_data']['property_type']
-        if prop_type == PropertyType.CONDOMINIUM:
-            await update.message.reply_text(
-                t('what_is_condo_scheme', lang=user.language),
-                reply_markup=keyboards.get_condo_scheme_keyboard(lang=user.language)
-            )
-            return STATE_SUBMIT_CONDO_SCHEME
-        else:
-            await update.message.reply_text(
-                t('what_is_price', lang=user.language), 
-                reply_markup=keyboards.REMOVE_KEYBOARD
-            )
-            return STATE_SUBMIT_PRICE
+        # --- UPDATED ---: The condo scheme question is now at the beginning of the flow.
+        await update.message.reply_text(
+            t('what_is_price', lang=user.language), 
+            reply_markup=keyboards.REMOVE_KEYBOARD
+        )
+        return STATE_SUBMIT_PRICE
     except (ValueError, TypeError):
         await update.message.reply_text(
             t('invalid_number', lang=user.language, default="That's not a valid number. Please use the buttons.")
         )
         return STATE_SUBMIT_PARKING_SPACES
-
-@handle_exceptions
-@ensure_user_data
-async def receive_condo_scheme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data['submission_data']['condominium_scheme'] = CondoScheme(update.message.text)
-    user: User = context.user_data['user']
-    await update.message.reply_text(
-        t('what_is_price', lang=user.language), 
-        reply_markup=keyboards.REMOVE_KEYBOARD
-    )
-    return STATE_SUBMIT_PRICE
 
 @handle_exceptions
 @ensure_user_data
@@ -390,7 +404,7 @@ async def receive_description(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data.pop('submission_data', None)
     return ConversationHandler.END
 
-# --- "My Listings" Handler (UPDATED) ---    
+# --- "My Listings" Handler (Unchanged) ---    
 @handle_exceptions
 @ensure_user_data
 async def my_listings(update: Update, context: ContextTypes.DEFAULT_TYPE):

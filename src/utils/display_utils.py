@@ -5,7 +5,6 @@ from telegram.helpers import escape_markdown
 def create_property_card_text(prop: Property, for_admin: bool = False, for_broker: bool = False) -> str:
     """
     Generates a beautifully formatted, detailed text card for a given property.
-    (This version is fully corrected to use escaped variables)
     """
     type_emojis = {
         PropertyType.APARTMENT: "🏢",
@@ -18,27 +17,28 @@ def create_property_card_text(prop: Property, for_admin: bool = False, for_broke
     header_emoji = type_emojis.get(prop.property_type, "🏠")
 
     # --- Escaped Variables ---
-    # Define them once, and use them throughout the function.
     property_type_val = escape_markdown(prop.property_type.value)
     city = escape_markdown(prop.location.city)
-    region = escape_markdown(prop.location.region)
-    sub_city = escape_markdown(prop.location.sub_city) if prop.location.sub_city else ""
+    # --- UPDATED: Use the new 'site' field ---
+    site = escape_markdown(prop.location.site) if prop.location.site else ""
 
-    # --- Header Construction (FIXED) ---
+    # --- Header Construction ---
     if for_admin:
         header = f"**{header_emoji} Property Review: {property_type_val}**"
     elif for_broker:
         header = f"**{header_emoji} Your Listing: {property_type_val}**"
     else:
-        header = f"**{header_emoji} {property_type_val} in {city}**"
+        # --- UPDATED: Header for public view ---
+        display_location = site if site else city
+        header = f"**{header_emoji} {property_type_val} in {display_location}**"
 
     details_list = []
     details_list.append(f"**💰 Price:** {prop.price_etb:,.2f} ETB")
 
-    # --- Location String Construction (FIXED) ---
-    location_str = f"{region} - {city}"
-    if sub_city:
-        location_str += f" - {sub_city}"
+    # --- Location String Construction (UPDATED) ---
+    location_str = f"{city}"
+    if site:
+        location_str += f" - {site}"
     details_list.append(f"**📍 Location:** {location_str}")
 
     details_list.append(f"**📐 Size:** {prop.size_sqm} m²")
@@ -53,13 +53,13 @@ def create_property_card_text(prop: Property, for_admin: bool = False, for_broke
         elif prop.property_type not in [PropertyType.BUILDING, PropertyType.DUPLEX]:
             details_list.append(f"**🧗 Floor Level:** {prop.floor_level}")
 
-    # --- Optional Details (FIXED) ---
+    # --- Optional Details (Unchanged) ---
     if prop.furnishing_status:
         details_list.append(f"**🛋️ Furnishing:** {escape_markdown(prop.furnishing_status.value)}")
     if prop.parking_spaces is not None:
         details_list.append(f"**🚗 Parking:** {prop.parking_spaces}")
     if prop.property_type == PropertyType.CONDOMINIUM and prop.condominium_scheme:
-        details_list.append(f"** схеме:** {escape_markdown(prop.condominium_scheme.value)}")
+        details_list.append(f"** схеме:** {escape_markdown(prop.condominium_scheme.value)}") # Note: Typo in original key " схеме"
 
     if prop.property_type == PropertyType.BUILDING:
         if prop.is_commercial is not None:
@@ -83,11 +83,11 @@ def create_property_card_text(prop: Property, for_admin: bool = False, for_broke
     
     details_list.append(f"**📜 Title Deed:** {'✅ Yes' if prop.title_deed else '❌ No'}")
 
-    # --- Description (Correct from before) ---
+    # --- Description (Unchanged) ---
     escaped_description = escape_markdown(prop.description)
     description = f"\n**📝 Description:**\n_{escaped_description}_"
     
-    # --- Extra Info (FIXED) ---
+    # --- Extra Info (Unchanged) ---
     extra_info = ""
     if for_admin:
         extra_info = (f"\n\n---\n**Admin Info:**\n"
@@ -100,7 +100,6 @@ def create_property_card_text(prop: Property, for_admin: bool = False, for_broke
                       f"{rejection_reason}")
     else:
         phone = settings.ADMIN_PHONE_NUMBER
-        # Escape the username just in case it contains underscores or other special chars
         telegram = escape_markdown(settings.ADMIN_TG_USERNAME)
         extra_info = (f"\n\n---\n"
                       f"**Interested in this property? Contact the agent:**\n"

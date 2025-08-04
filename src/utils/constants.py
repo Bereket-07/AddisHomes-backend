@@ -62,7 +62,16 @@ CONDOMINIUM_SITES = [
 ]
 
 
-
+COMMON_SITES = [
+    # Central Areas
+    "Piassa", "4 Kilo", "Legehar", "Kasanchis", "Wollo Sefer", "Olympia",
+    # Inner Ring
+    "Bethel", "Bisrate Gebriel", "Gotera",
+    # Outer Ring
+    "Bole", "Gerji", "Ayat", "Summit", "CMC",
+    # Farther Areas
+    "Kality", "Lebu", "Jemo", "Koye Feche", "Bulbula", "Asko"
+]
 
 # --- NEW: Regex for numeric button choices ---
 NUMERIC_CHOICE_REGEX = r"^\d+(\+)?( .*)?$" # Matches "1", "6+", "0 (Ground)"
@@ -74,6 +83,8 @@ NUMERIC_CHOICE_REGEX = r"^\d+(\+)?( .*)?$" # Matches "1", "6+", "0 (Ground)"
     STATE_SUBMIT_PROP_TYPE, 
     STATE_SUBMIT_LOCATION_SUB_CITY,
     STATE_SUBMIT_SPECIFIC_AREA,
+    STATE_SUBMIT_SITE,
+    STATE_SUBMIT_OTHER_SITE,
     STATE_SUBMIT_OTHER_AREA,
     STATE_SUBMIT_BEDROOMS, 
     STATE_SUBMIT_BATHROOMS,
@@ -105,7 +116,9 @@ NUMERIC_CHOICE_REGEX = r"^\d+(\+)?( .*)?$" # Matches "1", "6+", "0 (Ground)"
     STATE_FILTER_IS_TWO_STORY,
     STATE_FILTER_HAS_ENTRANCE,
     STATE_FILTER_SPECIFIC_AREA,
+    STATE_FILTER_SITE,
+    STATE_FILTER_OTHER_SITE,
 
     # Admin state
     STATE_ADMIN_REJECT_REASON_INPUT
-) = range(38)
+) = range(42)

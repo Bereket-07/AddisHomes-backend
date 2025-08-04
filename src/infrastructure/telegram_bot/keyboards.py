@@ -3,7 +3,8 @@ from src.domain.models.user_models import User, UserRole
 from src.domain.models.property_models import PropertyType, CondoScheme, FurnishingStatus
 from src.utils.i18n import t
 from src.utils.constants import *
-from src.utils.data_loader import location_data # Import our data loader
+# --- DEPRECATED: No longer need the complex data loader for locations ---
+# from src.utils.data_loader import location_data 
 
 
 # A constant to remove the reply keyboard
@@ -13,8 +14,6 @@ REMOVE_KEYBOARD = ReplyKeyboardRemove()
 BEDROOM_OPTIONS = ["1", "2", "3", "4", "5", "6+"]
 BATHROOM_OPTIONS = ["1", "2", "3", "4+"]
 REGIONS = ["Addis Ababa", "Amhara", "Oromia", "Other"]
-# Note: Text-based options like below should ideally be in i18n.py if they need translation
-# For now, we assume they are static or the number is the key part.
 FLOOR_LEVEL_OPTIONS = ["0 (Ground)", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10+"]
 PARKING_SPACES_OPTIONS = ["0", "1", "2", "3", "4+"]
 CONDO_SCHEMES = [cs.value for cs in CondoScheme]
@@ -31,11 +30,19 @@ SIZE_RANGES_TEXT = {
 }
 
 PRICE_RANGES_TEXT = {
-    "Under 5M": "0-5000000",
-    "5M - 10M": "5000000-10000000",
-    "10M - 20M": "10000000-20000000",
-    "20M - 33M": "20000000-33000000",
-    "Above 33M": "33000000-9999999999",
+    # Lower, more granular ranges
+    "Under 2.5M": "0-2500000",
+    "2.5M - 4M": "2500000-4000000",
+    "4M - 6M": "4000000-6000000",
+    "6M - 8M": "6000000-8000000",
+    # Mid-range
+    "8M - 11M": "8000000-11000000",
+    "11M - 14M": "11000000-14000000",
+    "14M - 17M": "14000000-17000000",
+    # Higher-end ranges
+    "17M - 22M": "17000000-22000000",
+    "22M - 30M": "22000000-30000000",
+    "Above 30M": "30000000-9999999999",
 }
 
 # --- Helper Function ---
@@ -52,7 +59,7 @@ def get_main_menu_keyboard(user: User) -> ReplyKeyboardMarkup:
         options.extend([t('submit_property', lang=lang), t('my_listings', lang=lang)])
     if UserRole.ADMIN in user.roles:
         options.append(t('admin_panel', lang=lang))
-    options.append(t('language_select', lang=lang)) # Add language button
+    options.append(t('language_select', lang=lang))
     return create_reply_options_keyboard(options, columns=2, add_cancel=False, lang=lang)
 
 def get_admin_panel_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
@@ -94,17 +101,23 @@ def get_language_selection_keyboard() -> ReplyKeyboardMarkup:
 def get_property_type_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
     return create_reply_options_keyboard([pt.value for pt in PropertyType], lang=lang)
 
-def get_sub_city_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
-    """Creates a dynamic keyboard for Addis Ababa sub-cities."""
-    return create_reply_options_keyboard(location_data.get_addis_sub_cities(), columns=2, lang=lang)
+# --- DEPRECATED KEYBOARDS ---
+# def get_sub_city_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup: ...
+# def get_neighborhood_keyboard(sub_city: str, lang: str = 'en') -> ReplyKeyboardMarkup: ...
+# def get_condo_site_keyboard(sub_city: str, lang: str = 'en') -> ReplyKeyboardMarkup: ...
 
-def get_neighborhood_keyboard(sub_city: str, lang: str = 'en') -> ReplyKeyboardMarkup:
-    """Creates a dynamic keyboard of neighborhoods for a given sub-city."""
-    return create_reply_options_keyboard(location_data.get_neighborhoods_for_sub_city(sub_city), columns=2, lang=lang)
+# --- NEW KEYBOARD for Apartment/Condo sites ---
+def get_site_keyboard(is_filter: bool = False, lang: str = 'en') -> ReplyKeyboardMarkup:
+    """Creates a dynamic keyboard for common sites."""
+    options = COMMON_SITES[:] # Create a copy
+    
+    # Add special options
+    options.append(t('other_option', lang=lang, default=OTHER_OPTION_EN))
+    if is_filter:
+        options.append(t('any_option', lang=lang))
+        
+    return create_reply_options_keyboard(options, columns=3, lang=lang)
 
-def get_condo_site_keyboard(sub_city: str, lang: str = 'en') -> ReplyKeyboardMarkup:
-    """Creates a dynamic keyboard of condominium sites for a given sub-city."""
-    return create_reply_options_keyboard(location_data.get_condo_sites_for_sub_city(sub_city), columns=1, lang=lang)
 
 def get_numeric_keyboard(options: list, lang: str = 'en') -> ReplyKeyboardMarkup:
     """Helper for numeric choice keyboards like bedrooms/bathrooms."""
@@ -146,7 +159,7 @@ def get_condo_scheme_keyboard(is_filter: bool = False, lang: str = 'en') -> Repl
     if is_filter:
         options.append(t('any_scheme', lang=lang))
     return create_reply_options_keyboard(options, lang=lang)
-# --- NEW KEYBOARD FUNCTION FOR VILLA STRUCTURE ---
+
 def get_g_plus_keyboard(is_filter: bool = False, lang: str = 'en') -> ReplyKeyboardMarkup:
     """Creates a keyboard for Villa G+ options."""
     options = G_PLUS_OPTIONS[:] # Create a copy

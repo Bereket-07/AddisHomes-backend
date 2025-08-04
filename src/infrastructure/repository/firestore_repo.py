@@ -1,5 +1,3 @@
-# src/infrastructure/repository/firestore_repo.py
-
 import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
@@ -17,7 +15,7 @@ class RealEstateRepository:
         self.users_collection = self.db.collection('users')
         self.properties_collection = self.db.collection('properties')
 
-    # --- User Methods ---
+    # --- User Methods (Unchanged) ---
     async def get_user_by_telegram_id(self, telegram_id: int) -> Optional[User]:
         try:
             docs = self.users_collection.where('telegram_id', '==', telegram_id).limit(1).stream()
@@ -96,7 +94,7 @@ class RealEstateRepository:
         except GoogleAPICallError as e:
             raise DatabaseError(f"Firestore error while finding unclaimed admin: {e}")
 
-    # --- Property Methods ---
+    # --- Property Methods (Unchanged except query_properties) ---
     async def create_property(self, property_data: PropertyCreate) -> Property:
         pid = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
@@ -149,6 +147,7 @@ class RealEstateRepository:
             raise DatabaseError(f"Firestore error while getting properties by broker ID: {e}")
 
     async def query_properties(self, filters: PropertyFilter) -> List[Property]:
+        # --- UPDATED ---
         try:
             status_to_query = filters.status.value if filters.status else PropertyStatus.APPROVED.value
             query = self.properties_collection.where(filter=FieldFilter('status', '==', status_to_query))
@@ -161,6 +160,11 @@ class RealEstateRepository:
                 query = query.where(filter=FieldFilter('bedrooms', '<=', filters.max_bedrooms))
             if filters.location_region:
                 query = query.where(filter=FieldFilter('location.region', '==', filters.location_region))
+            
+            # --- UPDATED: Filter by site instead of sub_city ---
+            if filters.location_site:
+                query = query.where(filter=FieldFilter('location.site', '==', filters.location_site))
+            
             if filters.min_price:
                 query = query.where(filter=FieldFilter('price_etb', '>=', filters.min_price))
             if filters.max_price:
@@ -176,29 +180,23 @@ class RealEstateRepository:
             if filters.filter_has_private_entrance is not None:
                 query = query.where('has_private_entrance', '==', filters.filter_has_private_entrance)
             if filters.min_floor_level is not None:
-                # Firestore does not support inequality filters on multiple fields.
-                # Since we likely already filter on price or bedrooms, we cannot
-                # add another inequality filter for 'floor_level'.
-                #
-                # SOLUTION: We will do this filtering in Python after getting the results.
-                # This is a common and acceptable pattern when dealing with Firestore's limitations.
-                pass # Logic will be handled below
+                pass # Post-query filtering
             
             docs_stream = query.stream()
             all_results = [Property(**doc.to_dict()) async for doc in docs_stream]
 
-            # --- POST-QUERY FILTERING IN PYTHON ---
+            # --- POST-QUERY FILTERING IN PYTHON (Unchanged) ---
             if filters.min_floor_level is not None:
                 final_results = [
                     prop for prop in all_results 
                     if prop.floor_level is not None and prop.floor_level >= filters.min_floor_level
                 ]
                 return final_results
-            # --- END POST-QUERY FILTERING ---
 
             return all_results
         except GoogleAPICallError as e:
             raise DatabaseError(f"Firestore error while querying properties: {e}")
+            
     async def delete_property(self, pid: str) -> None:
         """Permanently deletes a property document from Firestore."""
         doc_ref = self.properties_collection.document(pid)
@@ -210,11 +208,11 @@ class RealEstateRepository:
             return
         except GoogleAPICallError as e:
             raise DatabaseError(f"Firestore error while deleting property: {e}")
+
     async def count_properties_by_status(self) -> dict[PropertyStatus, int]:
         """Counts all properties grouped by their status using efficient aggregation."""
         counts = {status: 0 for status in PropertyStatus}
         try:
-            # We run a separate count query for each status. This is very efficient.
             for status in PropertyStatus:
                 query = self.properties_collection.where('status', '==', status.value)
                 count_query = query.count()

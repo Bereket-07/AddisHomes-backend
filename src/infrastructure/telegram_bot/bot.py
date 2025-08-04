@@ -23,9 +23,15 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     submission_conv = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex(create_i18n_regex('submit_property')), broker_handlers.start_submission)],
         states={
+            # --- UPDATED STATES ---
             STATE_SUBMIT_PROP_TYPE: [MessageHandler(filters.TEXT, broker_handlers.receive_property_type)],
-            STATE_SUBMIT_LOCATION_SUB_CITY: [MessageHandler(filters.TEXT, broker_handlers.receive_sub_city)],
-            STATE_SUBMIT_SPECIFIC_AREA: [MessageHandler(filters.TEXT, broker_handlers.receive_specific_area)],
+            STATE_SUBMIT_CONDO_SCHEME: [MessageHandler(filters.TEXT, broker_handlers.receive_condo_scheme)],
+            STATE_SUBMIT_SITE: [MessageHandler(filters.TEXT, broker_handlers.receive_site)],
+            STATE_SUBMIT_OTHER_SITE: [MessageHandler(filters.TEXT, broker_handlers.receive_other_site)],
+            
+            # --- DEPRECATED STATES from old flow ---
+            # STATE_SUBMIT_LOCATION_SUB_CITY
+            # STATE_SUBMIT_SPECIFIC_AREA
             
             # Branching Point
             STATE_SUBMIT_BEDROOMS: [MessageHandler(filters.TEXT, broker_handlers.receive_bedrooms)],
@@ -52,7 +58,6 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
             # Final Common Flow
             STATE_SUBMIT_TITLE_DEED: [MessageHandler(filters.TEXT, broker_handlers.receive_title_deed)],
             STATE_SUBMIT_PARKING_SPACES: [MessageHandler(filters.TEXT, broker_handlers.receive_parking_spaces)],
-            STATE_SUBMIT_CONDO_SCHEME: [MessageHandler(filters.TEXT, broker_handlers.receive_condo_scheme)],
             STATE_SUBMIT_PRICE: [MessageHandler(filters.TEXT, broker_handlers.receive_price)],
             STATE_SUBMIT_IMAGES: [
                 MessageHandler(filters.PHOTO, broker_handlers.receive_images),
@@ -68,11 +73,13 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     filter_conv = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex(create_i18n_regex('filter_properties')), buyer_handlers.start_filtering)],
         states={
-            # Branching Point
+            # --- UPDATED STATES ---
             STATE_FILTER_PROP_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_prop_type)],
-            
-            # Special Type Flows
             STATE_FILTER_CONDO_SCHEME: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_condo_scheme)],
+            STATE_FILTER_SITE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_site)],
+            STATE_FILTER_OTHER_SITE: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_other_site)],
+
+            # Special Type Flows
             STATE_FILTER_IS_COMMERCIAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_is_commercial)],
             STATE_FILTER_HAS_ELEVATOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_has_elevator)],
             STATE_FILTER_HAS_ROOFTOP: [MessageHandler(filters.TEXT & ~filters.COMMAND, buyer_handlers.receive_filter_has_rooftop)],
@@ -91,7 +98,6 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
 
     # 3. Admin: Property Rejection Flow
     admin_rejection_conv = ConversationHandler(
-        # Use the constant for the pattern
         entry_points=[CallbackQueryHandler(admin_handlers.reject_property_start, pattern=f"^{CB_ADMIN_REJECT}_")],
         states={
             STATE_ADMIN_REJECT_REASON_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handlers.reject_property_reason)]
@@ -100,25 +106,21 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
         per_message=False
     )
 
-    # --- REGISTERING ALL HANDLERS ---
+    # --- REGISTERING ALL HANDLERS (Unchanged from here) ---
 
     application.add_handler(CommandHandler("start", common_handlers.start))
-    # This handler now needs to be more robust
     role_regex = f"^({t('buyer_role', lang='en')}|{t('broker_role', lang='en')}|{t('buyer_role', lang='am')}|{t('broker_role', lang='am')})$"
     application.add_handler(MessageHandler(
         filters.Regex(role_regex), common_handlers.set_user_role
     ))
 
-    # Add Conversation Handlers for multi-step processes
     application.add_handler(submission_conv)
     application.add_handler(filter_conv)
     application.add_handler(admin_rejection_conv)
 
-    # NEW handler for language selection
     application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('language_select')), common_handlers.select_language_start))
     application.add_handler(MessageHandler(filters.Regex(r'^(English 🇬🇧|አማርኛ 🇪🇹)$'), common_handlers.set_language))
 
-    # Add MessageHandlers for top-level main menu actions
     application.add_handler(MessageHandler(filters.Regex(f"^🗂️ Manage Listings$"), admin_handlers.manage_listings))
     application.add_handler(MessageHandler(filters.Regex(f"^📊 View Analytics$"), admin_handlers.view_analytics))
     application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('browse_properties')), buyer_handlers.browse_all_properties))
@@ -127,8 +129,6 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('admin_pending_listings')), admin_handlers.view_pending_listings))
     application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('back_to_main_menu')), common_handlers.back_to_main_menu))
 
-    # Add the single CallbackQueryHandler for approving properties
-    # The rejection CbQ is the entry point for its own conversation handler.
     application.add_handler(CallbackQueryHandler(admin_handlers.approve_property, pattern=f"^{CB_ADMIN_APPROVE}_"))
     application.add_handler(CallbackQueryHandler(admin_handlers.mark_as_sold, pattern=f"^{CB_ADMIN_MARK_SOLD}_"))
     application.add_handler(CallbackQueryHandler(admin_handlers.delete_property_confirm, pattern=f"^{CB_ADMIN_DELETE_CONFIRM}_"))

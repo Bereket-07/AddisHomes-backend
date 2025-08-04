@@ -61,8 +61,9 @@ class PropertyFilter(BaseModel):
     min_bedrooms: Optional[int] = None
     max_bedrooms: Optional[int] = None
     location_region: Optional[str] = None
-    location_city: Optional[str] = None
-    location_sub_city: Optional[str] = None
+    # location_city: Optional[str] = None
+    # location_sub_city: Optional[str] = None
+    location_site: Optional[str] = None
     min_price: Optional[float] = None
     max_price: Optional[float] = None
     min_size_sqm: Optional[float] = None
