@@ -62,15 +62,27 @@ CONDOMINIUM_SITES = [
 ]
 
 
-COMMON_SITES = [
-    # Central Areas
-    "Piassa", "4 Kilo", "Legehar", "Kasanchis", "Wollo Sefer", "Olympia",
-    # Inner Ring
-    "Bethel", "Bisrate Gebriel", "Gotera",
-    # Outer Ring
-    "Bole", "Gerji", "Ayat", "Summit", "CMC",
-    # Farther Areas
-    "Kality", "Lebu", "Jemo", "Koye Feche", "Bulbula", "Asko"
+SUPPORTED_SITES = [
+    {"en": "Piassa", "am": "ፒያሳ"},
+    {"en": "4 Kilo", "am": "4 ኪሎ"},
+    {"en": "Legehar", "am": "ለገሃር"},
+    {"en": "Kasanchis", "am": "ካዛንቺስ"},
+    {"en": "Wollo Sefer", "am": "ወሎ ሰፈር"},
+    {"en": "Olympia", "am": "ኦሎምፒያ"},
+    {"en": "Bethel", "am": "ቤቴል"},
+    {"en": "Bisrate Gebriel", "am": "ብስራተ ገብርኤል"},
+    {"en": "Gotera", "am": "ጎተራ"},
+    {"en": "Bole", "am": "ቦሌ"},
+    {"en": "Gerji", "am": "ገርጂ"},
+    {"en": "Ayat", "am": "አያት"},
+    {"en": "Summit", "am": "ሰሚት"},
+    {"en": "Kality", "am": "ቃሊቲ"},
+    {"en": "Lebu", "am": "ለቡ"},
+    {"en": "Jemo", "am": "ጀሞ"},
+    {"en": "Koye Feche", "am": "ኮዬ ፈጬ"},
+    {"en": "Bulbula", "am": "ቡልቡላ"},
+    {"en": "CMC", "am": "ሲኤምሲ"},
+    {"en": "Asko", "am": "አስኮ"},
 ]
 
 # --- NEW: Regex for numeric button choices ---

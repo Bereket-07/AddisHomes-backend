@@ -99,7 +99,10 @@ def get_language_selection_keyboard() -> ReplyKeyboardMarkup:
 
 # --- Submission & Filter Flow Keyboards ---
 def get_property_type_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
-    return create_reply_options_keyboard([pt.value for pt in PropertyType], lang=lang)
+    """Creates a keyboard with translated property type names."""
+    # Generate translated button text for each property type enum
+    options = [t(f"prop_type_{pt.name.lower()}", lang=lang) for pt in PropertyType]
+    return create_reply_options_keyboard(options, lang=lang)
 
 # --- DEPRECATED KEYBOARDS ---
 # def get_sub_city_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup: ...
@@ -108,11 +111,13 @@ def get_property_type_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
 
 # --- NEW KEYBOARD for Apartment/Condo sites ---
 def get_site_keyboard(is_filter: bool = False, lang: str = 'en') -> ReplyKeyboardMarkup:
-    """Creates a dynamic keyboard for common sites."""
-    options = COMMON_SITES[:] # Create a copy
+    """Creates a dynamic keyboard for common sites in the user's language."""
+    # Use the user's language to get the translated site names for the buttons
+    # Falls back to English ('en') if the language key doesn't exist for some reason
+    options = [site.get(lang, site['en']) for site in SUPPORTED_SITES]
     
-    # Add special options
-    options.append(t('other_option', lang=lang, default=OTHER_OPTION_EN))
+    # Add special options (also translated)
+    options.append(t('other_option', lang=lang))
     if is_filter:
         options.append(t('any_option', lang=lang))
         
@@ -124,7 +129,8 @@ def get_numeric_keyboard(options: list, lang: str = 'en') -> ReplyKeyboardMarkup
     return create_reply_options_keyboard(options, columns=4, lang=lang)
 
 def get_bedroom_keyboard(is_filter: bool = False, lang: str = 'en') -> ReplyKeyboardMarkup:
-    options = BEDROOM_OPTIONS[:] # Create a copy
+    options = [t('bedroom_count', lang=lang, count=i) for i in range(1, 6)]
+    options.append(t('bedroom_plus', lang=lang, count=6))
     if is_filter:
         options.append(t('any_option', lang=lang))
     return create_reply_options_keyboard(options, columns=4, lang=lang)

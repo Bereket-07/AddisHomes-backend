@@ -28,41 +28,52 @@ async def start_submission(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 @handle_exceptions
 @ensure_user_data
 async def receive_property_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    # --- UPDATED ---
-    prop_type = PropertyType(update.message.text)
-    context.user_data['submission_data']['property_type'] = prop_type
-    # For now, we assume Addis Ababa. This could be a question itself.
-    context.user_data['submission_data']['location'] = {'region': 'Addis Ababa', 'city': 'Addis Ababa'}
+    """Receives translated property type and converts it back to the enum."""
+    user_input = update.message.text
     user: User = context.user_data['user']
+    lang = user.language
+    selected_prop_type = None
 
-    if prop_type == PropertyType.CONDOMINIUM:
-        # For Condos, ask for Scheme first.
+    # --- NEW LOGIC: Reverse-translate the user's input to find the correct enum ---
+    for pt in PropertyType:
+        translated_name = t(f"prop_type_{pt.name.lower()}", lang=lang)
+        if user_input == translated_name:
+            selected_prop_type = pt
+            break
+
+    # If we couldn't find a match, something went wrong (user typed manually).
+    # For now, we'll assume they use the keyboard. If not, this will gracefully fail.
+    if not selected_prop_type:
+        # You could optionally send an error message here
+        return STATE_SUBMIT_PROP_TYPE
+
+    context.user_data['submission_data']['property_type'] = selected_prop_type
+    context.user_data['submission_data']['location'] = {'region': 'Addis Ababa', 'city': 'Addis Ababa'}
+
+    if selected_prop_type == PropertyType.CONDOMINIUM:
         await update.message.reply_text(
-            t('what_is_condo_scheme', lang=user.language),
-            reply_markup=keyboards.get_condo_scheme_keyboard(lang=user.language)
+            t('what_is_condo_scheme', lang=lang),
+            reply_markup=keyboards.get_condo_scheme_keyboard(lang=lang)
         )
         return STATE_SUBMIT_CONDO_SCHEME
     
-    elif prop_type == PropertyType.APARTMENT:
-        # For Apartments, go directly to Site selection.
+    elif selected_prop_type == PropertyType.APARTMENT:
         await update.message.reply_text(
-            t('select_site', lang=user.language, default="Please select the site/area."),
-            reply_markup=keyboards.get_site_keyboard(lang=user.language)
+            t('select_site', lang=lang, default="Please select the site/area."),
+            reply_markup=keyboards.get_site_keyboard(lang=lang)
         )
         return STATE_SUBMIT_SITE
     
-    # Existing logic for other property types remains the same
-    elif prop_type == PropertyType.BUILDING:
+    elif selected_prop_type == PropertyType.BUILDING:
         await update.message.reply_text(
-            t('is_commercial', lang=user.language),
-            reply_markup=keyboards.get_boolean_keyboard(lang=user.language)
+            t('is_commercial', lang=lang),
+            reply_markup=keyboards.get_boolean_keyboard(lang=lang)
         )
         return STATE_SUBMIT_IS_COMMERCIAL
     else:
-        # All other types (Villa, Penthouse, Duplex) have bedrooms.
         await update.message.reply_text(
-            t('how_many_bedrooms', lang=user.language), 
-            reply_markup=keyboards.get_bedroom_keyboard(lang=user.language)
+            t('how_many_bedrooms', lang=lang), 
+            reply_markup=keyboards.get_bedroom_keyboard(lang=lang)
         )
         return STATE_SUBMIT_BEDROOMS
 
@@ -86,23 +97,32 @@ async def receive_condo_scheme(update: Update, context: ContextTypes.DEFAULT_TYP
 @handle_exceptions
 @ensure_user_data
 async def receive_site(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives the site selection and handles the 'Other' option."""
+    """Receives the site selection, handles 'Other', and translates input."""
     user_input = update.message.text
     user: User = context.user_data['user']
-    other_option_text = t('other_option', lang=user.language, default=OTHER_OPTION_EN)
+    lang = user.language
+    other_option_text = t('other_option', lang=lang)
 
     if user_input == other_option_text:
         await update.message.reply_text(
-            t('type_specific_area', lang=user.language),
+            t('type_specific_area', lang=lang),
             reply_markup=keyboards.REMOVE_KEYBOARD
         )
         return STATE_SUBMIT_OTHER_SITE
     else:
-        # Store the site and move on to bedrooms
-        context.user_data['submission_data']['location']['site'] = user_input
+        # --- NEW LOGIC: Reverse translate the input to store a consistent value ---
+        site_to_store = user_input # Default to the input itself
+        # Find the English value corresponding to the Amharic input
+        for site in SUPPORTED_SITES:
+            if site.get(lang) == user_input:
+                site_to_store = site['en']
+                break
+        
+        # Store the standardized English site name and move on
+        context.user_data['submission_data']['location']['site'] = site_to_store
         await update.message.reply_text(
-            t('how_many_bedrooms', lang=user.language), 
-            reply_markup=keyboards.get_bedroom_keyboard(lang=user.language)
+            t('how_many_bedrooms', lang=lang), 
+            reply_markup=keyboards.get_bedroom_keyboard(lang=lang)
         )
         return STATE_SUBMIT_BEDROOMS
 

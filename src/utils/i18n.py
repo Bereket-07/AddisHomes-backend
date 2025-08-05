@@ -21,6 +21,15 @@ translations = {
         'op_cancelled': "Operation cancelled. Returning to the main menu.",
         'error_occurred': "An error occurred. Please try again.",
 
+        # --- ADD THESE NEW TRANSLATIONS ---
+        'prop_type_apartment': "Apartment",
+        'prop_type_condominium': "Condominium",
+        'prop_type_villa': "Villa",
+        'prop_type_building': "Building",
+        'prop_type_penthouse': "Penthouse",
+        'prop_type_duplex': "Duplex",
+        # ------------------------------------
+
         # Language Selection
         'select_language_prompt': "Please select your preferred language:",
         'language_updated': "Language has been updated to {lang_name}.",
@@ -58,7 +67,7 @@ translations = {
         'select_sub_city': "In which Sub-city is the property located?",
         'select_neighborhood': "Please select the nearest neighborhood/area.",
         'select_condo_site': "Please select the Condominium Site name.",
-        'type_specific_area': "Could not find specific areas. Please type the specific area name.",
+        'type_specific_area': "Please type the specific area name.",
         'how_many_bedrooms': "How many bedrooms?",
         'how_many_bathrooms': "How many bathrooms?",
         'what_is_size': "What is the approximate size?",
@@ -101,6 +110,8 @@ translations = {
         'ask_filter_has_rooftop': "Must have a private rooftop?",
         'ask_filter_is_two_story': "Show only two-story penthouses?",
         'ask_filter_has_entrance': "Must have a private entrance?",
+        'bedroom_count': "{count} Bedroom",
+        'bedroom_plus': "{count}+ Bedroom",
     },
     'am': {
         # General & Main Menu
@@ -124,6 +135,15 @@ translations = {
         # Language Selection
         'select_language_prompt': "እባክዎ ተመራጭ ቋንቋዎን ይምረጡ:",
         'language_updated': "ቋንቋ ወደ {lang_name} ተቀይሯል።",
+
+        # --- ADD THESE NEW TRANSLATIONS ---
+        'prop_type_apartment': "አፓርታማ",
+        'prop_type_condominium': "ኮንዶሚኒየም",
+        'prop_type_villa': "ቪላ",
+        'prop_type_building': "ህንጻ",
+        'prop_type_penthouse': "ፔንትሃውስ",
+        'prop_type_duplex': "ዱፕሌክስ",
+        # ------------------------------------
 
         # Admin Panel & Actions
         'admin_pending_listings': "⏳ በመጠባበቅ ላይ ያሉ ዝርዝሮች",
@@ -158,7 +178,7 @@ translations = {
         'select_sub_city': "ንብረቱ በየትኛው ክፍለ ከተማ ነው የሚገኘው?",
         'select_neighborhood': "እባክዎ በአቅራቢያ የሚገኘውን ሰፈር/አካባቢ ይምረጡ።",
         'select_condo_site': "እባክዎ የኮንዶሚኒየም ሳይቱን ስም ይምረጡ።",
-        'type_specific_area': "የተወሰኑ ቦታዎችን ማግኘት አልተቻለም። እባክዎ የአካባቢውን ስም ይጻፉ።",
+        'type_specific_area': " እባክዎ የአካባቢውን ስም ይጻፉ።",
         'how_many_bedrooms': "ስንት መኝታ ክፍሎች አሉት?",
         'how_many_bathrooms': "ስንት ሽንት ቤት አሉት?",
         'what_is_size': "የቦታው ስፋት ስንት ነው?",
@@ -201,6 +221,8 @@ translations = {
         'ask_filter_has_rooftop': "የግል ጣራ የግድ ሊኖረው ይገባል?",
         'ask_filter_is_two_story': "ባለ ሁለት ፎቅ ፔንትሃውሶችን ብቻ አሳይ?",
         'ask_filter_has_entrance': "የግል መግቢያ የግድ ሊኖረው ይገባል?",
+        'bedroom_count': "{count} መኝታ",
+        'bedroom_plus': "{count}+ መኝታ"
     }
 }
 

@@ -9,6 +9,8 @@ from src.utils.i18n import t
 from src.utils.constants import *
 from src.utils.display_utils import create_property_card_text
 from .common_handlers import ensure_user_data, handle_exceptions
+import re
+from src.utils.constants import CONDOMINIUM_SITES, OTHER_OPTION_EN , OTHER_OPTION_AM
 
 logger = logging.getLogger(__name__)
 
@@ -80,31 +82,43 @@ async def start_filtering(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 @handle_exceptions
 @ensure_user_data
 async def receive_filter_prop_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    # --- UPDATED ---
-    prop_type = PropertyType(update.message.text)
-    context.user_data['filters']['property_type'] = prop_type
+    """Receives translated property type for filtering and converts it to the enum."""
+    user_input = update.message.text
     user: User = context.user_data['user']
+    lang = user.language
+    selected_prop_type = None
+
+    # --- NEW LOGIC: Reverse-translate the user's input to find the correct enum ---
+    for pt in PropertyType:
+        translated_name = t(f"prop_type_{pt.name.lower()}", lang=lang)
+        if user_input == translated_name:
+            selected_prop_type = pt
+            break
+
+    if not selected_prop_type:
+        return STATE_FILTER_PROP_TYPE
+
+    context.user_data['filters']['property_type'] = selected_prop_type
     
-    if prop_type == PropertyType.CONDOMINIUM:
-        await update.message.reply_text(t('select_condo_scheme', lang=user.language), reply_markup=keyboards.get_condo_scheme_keyboard(is_filter=True, lang=user.language))
+    if selected_prop_type == PropertyType.CONDOMINIUM:
+        await update.message.reply_text(t('select_condo_scheme', lang=lang), reply_markup=keyboards.get_condo_scheme_keyboard(is_filter=True, lang=lang))
         return STATE_FILTER_CONDO_SCHEME
     
-    elif prop_type == PropertyType.APARTMENT:
-        await update.message.reply_text(t('select_site_filter', lang=user.language, default="Filter by site/area:"), reply_markup=keyboards.get_site_keyboard(is_filter=True, lang=user.language))
+    elif selected_prop_type == PropertyType.APARTMENT:
+        await update.message.reply_text(t('select_site_filter', lang=lang, default="Filter by site/area:"), reply_markup=keyboards.get_site_keyboard(is_filter=True, lang=lang))
         return STATE_FILTER_SITE
 
-    # Existing logic for other types
-    elif prop_type == PropertyType.BUILDING:
-        await update.message.reply_text(t('ask_filter_is_commercial', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
+    elif selected_prop_type == PropertyType.BUILDING:
+        await update.message.reply_text(t('ask_filter_is_commercial', lang=lang), reply_markup=keyboards.get_boolean_keyboard(lang=lang))
         return STATE_FILTER_IS_COMMERCIAL
-    elif prop_type == PropertyType.PENTHOUSE:
-        await update.message.reply_text(t('ask_filter_has_rooftop', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
+    elif selected_prop_type == PropertyType.PENTHOUSE:
+        await update.message.reply_text(t('ask_filter_has_rooftop', lang=lang), reply_markup=keyboards.get_boolean_keyboard(lang=lang))
         return STATE_FILTER_HAS_ROOFTOP
-    elif prop_type == PropertyType.DUPLEX:
-        await update.message.reply_text(t('ask_filter_has_entrance', lang=user.language), reply_markup=keyboards.get_boolean_keyboard(lang=user.language))
+    elif selected_prop_type == PropertyType.DUPLEX:
+        await update.message.reply_text(t('ask_filter_has_entrance', lang=lang), reply_markup=keyboards.get_boolean_keyboard(lang=lang))
         return STATE_FILTER_HAS_ENTRANCE
-    else: # Villa, etc. go to the price range
-        await update.message.reply_text(t('select_price_range', lang=user.language), reply_markup=keyboards.get_price_range_keyboard(lang=user.language))
+    else:
+        await update.message.reply_text(t('select_price_range', lang=lang), reply_markup=keyboards.get_price_range_keyboard(lang=lang))
         return STATE_FILTER_PRICE_RANGE
 
 # === BUILDING FILTER FLOW (Unchanged) ===
@@ -166,21 +180,29 @@ async def receive_filter_condo_scheme(update: Update, context: ContextTypes.DEFA
 @handle_exceptions
 @ensure_user_data
 async def receive_filter_site(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives site filter and handles 'Other' and 'Any'."""
+    """Receives site filter, handles 'Other'/'Any', and translates input."""
     user_input = update.message.text
     user: User = context.user_data['user']
-    other_option_text = t('other_option', lang=user.language, default=OTHER_OPTION_EN)
-    any_option_text = t('any_option', lang=user.language)
+    lang = user.language
+    other_option_text = t('other_option', lang=lang)
+    any_option_text = t('any_option', lang=lang)
 
     if user_input == other_option_text:
-        await update.message.reply_text(t('type_specific_area', lang=user.language))
+        await update.message.reply_text(t('type_specific_area', lang=lang))
         return STATE_FILTER_OTHER_SITE
     
     if user_input != any_option_text:
-        context.user_data['filters']['location_site'] = user_input
+        # --- NEW LOGIC: Reverse translate the input for consistent filtering ---
+        site_to_filter = user_input # Default to the input itself
+        # Find the English value corresponding to the Amharic input
+        for site in SUPPORTED_SITES:
+            if site.get(lang) == user_input:
+                site_to_filter = site['en']
+                break
+        context.user_data['filters']['location_site'] = site_to_filter
     
     # Move on to the next filter: price range
-    await update.message.reply_text(t('select_price_range', lang=user.language), reply_markup=keyboards.get_price_range_keyboard(lang=user.language))
+    await update.message.reply_text(t('select_price_range', lang=lang), reply_markup=keyboards.get_price_range_keyboard(lang=lang))
     return STATE_FILTER_PRICE_RANGE
 
 # --- NEW HANDLER for "Other" site filter ---
@@ -251,10 +273,25 @@ async def receive_filter_villa_structure(update: Update, context: ContextTypes.D
 @handle_exceptions
 @ensure_user_data
 async def receive_filter_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Receives the bedroom filter choice (e.g., "3 Bedroom" or "3 መኝታ")
+    and extracts the number from the text before saving.
+    """
     user: User = context.user_data['user']
-    if update.message.text != t('any_option', lang=user.language):
-        min_bedrooms = int(update.message.text.replace('+', ''))
-        context.user_data['filters']['min_bedrooms'] = min_bedrooms
+    user_input = update.message.text
+
+    if user_input != t('any_option', lang=user.language):
+        # Use a regular expression to find the first sequence of digits in the string.
+        # This reliably finds "3" in "3 Bedroom" or "3 መኝታ".
+        match = re.search(r'\d+', user_input)
+
+        if match:
+            # If a number was found in the text...
+            # Get the found number (e.g., "3") and convert it to an integer
+            min_bedrooms = int(match.group(0))
+            context.user_data['filters']['min_bedrooms'] = min_bedrooms
+        # If no number is found for some reason, we just move on without setting the filter.
+
     return await end_filter_conversation(update, context)
 
 async def end_filter_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

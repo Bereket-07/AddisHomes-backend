@@ -192,3 +192,4 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text=t('language_updated', lang=lang_code, lang_name=chosen_lang),
         reply_markup=keyboards.get_main_menu_keyboard(updated_user)
     )
+
