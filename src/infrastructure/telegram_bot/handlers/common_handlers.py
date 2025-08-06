@@ -193,3 +193,31 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=keyboards.get_main_menu_keyboard(updated_user)
     )
 
+@handle_exceptions
+@ensure_user_data
+async def handle_stuck_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    A catch-all fallback handler.
+    If the user is in a conversation and sends a message that doesn't match any
+    state or the cancel button, this function will catch it, end the conversation,
+    and return them to the main menu.
+    """
+    user_id = update.effective_user.id
+    user_message = update.message.text
+    logger.warning(f"User {user_id} sent an unexpected message ('{user_message}') in a conversation. Resetting flow.")
+
+    # Clean up any lingering data to ensure a fresh start.
+    context.user_data.pop('submission_data', None)
+    context.user_data.pop('filters', None)
+    context.user_data.pop('prop_to_reject', None)
+
+    user = context.user_data['user']
+    
+    # Send a helpful message explaining what happened.
+    await update.message.reply_text(
+        text=t('stuck_conversation_message', lang=user.language, default="It looks like that action is no longer valid. Let's go back to the main menu to start fresh."),
+        reply_markup=keyboards.get_main_menu_keyboard(user)
+    )
+    
+    # Officially end the conversation.
+    return ConversationHandler.END

@@ -112,6 +112,7 @@ translations = {
         'ask_filter_has_entrance': "Must have a private entrance?",
         'bedroom_count': "{count} Bedroom",
         'bedroom_plus': "{count}+ Bedroom",
+        'stuck_conversation_message': "It looks like that action is no longer valid. Let's go back to the main menu to start fresh.",
     },
     'am': {
         # General & Main Menu
@@ -145,6 +146,7 @@ translations = {
         'prop_type_duplex': "ዱፕሌክስ",
         # ------------------------------------
 
+        'stuck_conversation_message': "ይህ ክንውን ያለፈበት ይመስላል። እንደ አዲስ ለመጀመር ወደ ዋናው ምናሌ እንመለስ።",
         # Admin Panel & Actions
         'admin_pending_listings': "⏳ በመጠባበቅ ላይ ያሉ ዝርዝሮች",
         'admin_manage_listings': "🗂️ ዝርዝሮችን ያስተዳድሩ",

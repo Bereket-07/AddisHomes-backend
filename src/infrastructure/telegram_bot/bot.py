@@ -20,13 +20,27 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     application.bot_data["user_use_cases"] = user_cases
     application.bot_data["property_use_cases"] = prop_cases
 
-    # --- SOLUTION: Create reusable filters ---
+    # --- NEW & IMPROVED: Reusable Components for Robust Conversations ---
     # 1. A filter that specifically matches the "Cancel" button in any language
     cancel_regex = create_i18n_regex('cancel')
     cancel_filter = filters.Regex(cancel_regex)
 
     # 2. A filter for general text input that EXCLUDES the cancel command
     text_input_filter = filters.TEXT & ~filters.COMMAND & ~cancel_filter
+    
+    # 3. A filter for the "stuck conversation" safety net
+    stuck_filter = filters.TEXT & ~filters.COMMAND
+
+    # 4. A standard timeout for all conversations (1800 seconds = 30 minutes)
+    CONVERSATION_TIMEOUT = 1800
+
+    # 5. A reusable list of fallback handlers for ALL conversations.
+    common_fallbacks = [
+        MessageHandler(cancel_filter, common_handlers.cancel_conversation),
+        MessageHandler(stuck_filter, common_handlers.handle_stuck_conversation)
+    ]
+    # --- END of New Components ---
+
 
     # --- CONVERSATION HANDLER DEFINITIONS ---
 
@@ -60,7 +74,9 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
             ],
             STATE_SUBMIT_DESCRIPTION: [MessageHandler(text_input_filter, broker_handlers.receive_description)],
         },
-        fallbacks=[MessageHandler(cancel_filter, common_handlers.cancel_conversation)],
+        fallbacks=common_fallbacks, # Use the new common fallbacks list
+        conversation_timeout=CONVERSATION_TIMEOUT,
+        name="property_submission",
         per_message=False
     )
 
@@ -83,7 +99,9 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
             STATE_FILTER_VILLA_STRUCTURE: [MessageHandler(text_input_filter, buyer_handlers.receive_filter_villa_structure)],
             STATE_FILTER_BEDROOMS: [MessageHandler(text_input_filter, buyer_handlers.receive_filter_bedrooms)],
         },
-        fallbacks=[MessageHandler(cancel_filter, common_handlers.cancel_conversation)],
+        fallbacks=common_fallbacks, # Use the new common fallbacks list
+        conversation_timeout=CONVERSATION_TIMEOUT,
+        name="property_filtering",
         per_message=False
     )
 
@@ -93,12 +111,13 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
         states={
             STATE_ADMIN_REJECT_REASON_INPUT: [MessageHandler(text_input_filter, admin_handlers.reject_property_reason)]
         },
-        # CORRECTED FALLBACK: Use the cancel_filter for the button, not a CommandHandler
-        fallbacks=[MessageHandler(cancel_filter, common_handlers.cancel_conversation)],
+        fallbacks=common_fallbacks, # Use the new common fallbacks list
+        conversation_timeout=CONVERSATION_TIMEOUT,
+        name="admin_rejection",
         per_message=False
     )
 
-    # --- REGISTERING ALL HANDLERS (Unchanged from here) ---
+    # --- REGISTERING ALL HANDLERS (Preserved from your original code) ---
     application.add_handler(CommandHandler("start", common_handlers.start))
     role_regex = f"^({t('buyer_role', lang='en')}|{t('broker_role', lang='en')}|{t('buyer_role', lang='am')}|{t('broker_role', lang='am')})$"
     application.add_handler(MessageHandler(
@@ -112,14 +131,18 @@ def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases
     application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('language_select')), common_handlers.select_language_start))
     application.add_handler(MessageHandler(filters.Regex(r'^(English 🇬🇧|አማርኛ 🇪🇹)$'), common_handlers.set_language))
 
+    # Preserving your original emoji-based regex handlers
     application.add_handler(MessageHandler(filters.Regex(f"^🗂️ Manage Listings$"), admin_handlers.manage_listings))
     application.add_handler(MessageHandler(filters.Regex(f"^📊 View Analytics$"), admin_handlers.view_analytics))
+    
+    # Other top-level menu commands
     application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('browse_properties')), buyer_handlers.browse_all_properties))
     application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('my_listings')), broker_handlers.my_listings))
     application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('admin_panel')), admin_handlers.admin_panel))
     application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('admin_pending_listings')), admin_handlers.view_pending_listings))
     application.add_handler(MessageHandler(filters.Regex(create_i18n_regex('back_to_main_menu')), common_handlers.back_to_main_menu))
 
+    # Inline Keyboard (Callback) Handlers
     application.add_handler(CallbackQueryHandler(admin_handlers.approve_property, pattern=f"^{CB_ADMIN_APPROVE}_"))
     application.add_handler(CallbackQueryHandler(admin_handlers.mark_as_sold, pattern=f"^{CB_ADMIN_MARK_SOLD}_"))
     application.add_handler(CallbackQueryHandler(admin_handlers.delete_property_confirm, pattern=f"^{CB_ADMIN_DELETE_CONFIRM}_"))
