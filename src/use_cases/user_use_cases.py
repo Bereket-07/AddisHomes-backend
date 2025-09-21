@@ -4,6 +4,8 @@ from src.domain.models.user_models import User, UserCreate, UserRole
 from src.utils.config import settings
 from src.utils.exceptions import UserNotFoundError
 from src.utils.i18n import translations
+from src.utils.auth_utils import hash_password ,verify_password, create_access_token
+
 
 class UserUseCases:
     def __init__(self, repo: RealEstateRepository):
@@ -80,3 +82,8 @@ class UserUseCases:
         if lang_code not in translations:
             lang_code = 'en' # Default to english if invalid code is passed
         return await self.repo.update_user(user_id, {"language": lang_code})
+    async def authenticate_user(self, phone_number: str, password: str) -> Optional[User]:
+        user = await self.repo.get_user_by_phone_number(phone_number)
+        if not user or not verify_password(password, user.hashed_password):
+            return None
+        return user

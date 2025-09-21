@@ -8,6 +8,8 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 from src.domain.models.property_models import Property, PropertyCreate, PropertyInDB, PropertyFilter, PropertyStatus
 from src.utils.config import settings
 from src.utils.exceptions import DatabaseError, UserNotFoundError, PropertyNotFoundError
+from src.utils.auth_utils import hash_password ,verify_password, create_access_token
+
 
 class RealEstateRepository:
     def __init__(self):
@@ -46,19 +48,22 @@ class RealEstateRepository:
             raise DatabaseError(f"Firestore error while getting user by phone: {e}")
 
     async def create_user(self, user_data: UserCreate) -> User:
-        uid = str(uuid.uuid4())
-        now = datetime.now(timezone.utc)
-        user_in_db = UserInDB(
-            uid=uid,
-            created_at=now,
-            updated_at=now,
-            **user_data.model_dump()
-        )
-        try:
-            await self.users_collection.document(uid).set(user_in_db.model_dump())
-            return User(**user_in_db.model_dump())
-        except GoogleAPICallError as e:
-            raise DatabaseError(f"Firestore error while creating user: {e}")
+            uid = str(uuid.uuid4())
+            now = datetime.now(timezone.utc)
+            user_in_db_dict = {
+                "uid": uid,
+                "created_at": now,
+                "updated_at": now,
+                **user_data.model_dump(exclude={"password"})
+            }
+            if user_data.password:
+                user_in_db_dict["hashed_password"] = hash_password(user_data.password)
+            user_in_db = UserInDB(**user_in_db_dict)
+            try:
+                await self.users_collection.document(uid).set(user_in_db.model_dump())
+                return User(**user_in_db.model_dump(exclude={"hashed_password"}))
+            except GoogleAPICallError as e:
+                raise DatabaseError(f"Firestore error while creating user: {e}")
 
     async def update_user(self, uid: str, updates: Dict[str, Any]) -> User:
         doc_ref = self.users_collection.document(uid)

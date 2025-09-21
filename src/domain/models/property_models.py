@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field 
 from typing import List, Optional
 from datetime import datetime
 from .common_models import PropertyType, PropertyStatus, Location, CondoScheme, FurnishingStatus
+
 
 class PropertyBase(BaseModel):
     property_type: PropertyType
@@ -11,7 +12,7 @@ class PropertyBase(BaseModel):
     size_sqm: float = Field(..., gt=0)
     price_etb: float = Field(..., gt=0)
     description: str
-    image_urls: List[str] = Field(..., min_length=3)
+    image_urls: List[str] = Field(..., min_length=1) 
     
     # Optional fields based on your requirements
     furnishing_status: Optional[FurnishingStatus] = None
@@ -41,8 +42,10 @@ class PropertyBase(BaseModel):
     has_private_entrance: Optional[bool] = None
 
 class PropertyCreate(PropertyBase):
-    broker_id: str
-    broker_name: str
+    broker_id: Optional[str] = None
+    broker_name: Optional[str] = None
+    broker_phone: Optional[str] = None
+
 
 class PropertyInDB(PropertyCreate):
     pid: str

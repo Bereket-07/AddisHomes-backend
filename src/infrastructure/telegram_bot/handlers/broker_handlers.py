@@ -377,9 +377,18 @@ async def receive_images(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             t('not_an_image', lang=user.language, default="That's not an image. Please send photos or click the 'Done' button.")
         )
         return STATE_SUBMIT_IMAGES
-    context.user_data['submission_data']['image_urls'].append(update.message.photo[-1].file_id)
+    # Take the highest resolution version
+    photo = update.message.photo[-1]
+    file_id = photo.file_id
+
+    # Upload to Firebase Storage and get permanent URL
+    public_url = await upload_telegram_photo_to_storage(context.bot, file_id)
+
+    # Store the permanent URL instead of file_id
+    context.user_data['submission_data']['image_urls'].append(public_url)
+
     await update.message.reply_text(
-        t('image_received', lang=user.language, default="Image {count} received. Send more or click 'Done Uploading'.").format(count=len(context.user_data['submission_data']['image_urls']))
+        t('image_received', lang=user.language, default="Image {count} received. Send more or click 'Done Uploading'.", count=len(context.user_data['submission_data']['image_urls']))
     )
     return STATE_SUBMIT_IMAGES
 
@@ -390,7 +399,7 @@ async def done_receiving_images(update: Update, context: ContextTypes.DEFAULT_TY
     user: User = context.user_data['user']
     if len(images) < 3:
         await update.message.reply_text(
-            t('need_more_images', lang=user.language).format(count=len(images))
+            t('need_more_images', lang=user.language, count=len(images))
         )
         return STATE_SUBMIT_IMAGES
     await update.message.reply_text(

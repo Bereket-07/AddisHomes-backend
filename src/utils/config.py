@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     
     # Firestore
     GOOGLE_APPLICATION_CREDENTIALS: str = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+    SERVICE_URL: str = os.getenv("SERVICE_URL")
 
     # Telegram
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -18,7 +19,8 @@ class Settings(BaseSettings):
     
     # Admin
     ADMIN_PHONE_NUMBER: str
-
+    SECRET_KEY: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     class Config:
         case_sensitive = True
 

@@ -1,19 +1,71 @@
-# This file is a placeholder for future web app authentication.
-# For a web app, you would implement JWT-based authentication here.
-# The Telegram bot handles auth via telegram_id.
-
+# src/controllers/auth_controller.py
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from src.app.startup import get_user_use_cases
 from src.use_cases.user_use_cases import UserUseCases
+from src.domain.models.user_models import User, UserRole, UserCreate
+from src.utils.auth_utils import create_access_token
+from src.utils.config import settings
+from jose import JWTError, jwt
+from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-@router.post("/login")
-async def web_login():
-    """Endpoint for future web app login (e.g., with OTP)."""
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Web login not yet implemented.")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-@router.get("/me")
-async def read_users_me():
-    """Endpoint to get current user info for a logged-in web user."""
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Web user profile not yet implemented.")
+class SignupRequest(BaseModel):
+    phone_number: str
+    password: str
+    role: UserRole
+    display_name: Optional[str] = None
+
+@router.post("/signup")
+async def signup(request: SignupRequest, user_cases: UserUseCases = Depends(get_user_use_cases)):
+    existing_user = await user_cases.repo.get_user_by_phone_number(request.phone_number)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Phone number already registered")
+    create_data = UserCreate(
+        phone_number=request.phone_number,
+        telegram_id=0,
+        display_name=request.display_name,
+        roles=[request.role],
+        language="en",
+        password=request.password
+    )
+    new_user = await user_cases.repo.create_user(create_data)
+    return {"detail": "User created successfully", "user_id": new_user.uid}
+
+class LoginRequest(BaseModel):
+    phone_number: str
+    password: str
+
+@router.post("/login")
+async def login(request: LoginRequest, user_cases: UserUseCases = Depends(get_user_use_cases)):
+    user = await user_cases.authenticate_user(request.phone_number, request.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect phone number or password")
+    access_token = create_access_token(data={"sub": user.uid})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+async def get_current_user(token: str = Depends(oauth2_scheme), user_cases: UserUseCases = Depends(get_user_use_cases)) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        uid: str = payload.get("sub")
+        if uid is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = await user_cases.get_user_by_id(uid)
+    if user is None:
+        raise credentials_exception
+    return user
+
+@router.get("/me", response_model=User)
+async def read_users_me(current_user: User = Depends(get_current_user)):
+    return current_user

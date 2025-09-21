@@ -1,10 +1,15 @@
-# src/controllers/property_controller.py
-
+# src/controllers/property_controller.py (updated)
 from typing import List
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
+from fastapi.responses import JSONResponse
 from src.use_cases.property_use_cases import PropertyUseCases
-from src.domain.models.property_models import Property, PropertyFilter, PropertyType, CondoScheme
+from src.domain.models.property_models import Property, PropertyFilter, PropertyType, CondoScheme, PropertyCreate
 from src.app.startup import get_property_use_cases
+from src.controllers.auth_controller import get_current_user
+from src.domain.models.user_models import User, UserRole
+import os
+import uuid
+from datetime import datetime
 
 router = APIRouter(prefix="/properties", tags=["Properties"])
 
@@ -15,39 +20,129 @@ async def find_properties_endpoint(
     max_bedrooms: int | None = Query(None, gt=0),
     min_price: float | None = Query(None, gt=0),
     max_price: float | None = Query(None, gt=0),
-    condo_scheme: CondoScheme | None = Query(None),
-    region: str | None = Query(None),
+    min_size_sqm: float | None = Query(None, gt=0),
+    max_size_sqm: float | None = Query(None, gt=0),
+    condominium_scheme: CondoScheme | None = Query(None),
+    location_region: str | None = Query(None),
+    location_site: str | None = Query(None),
+    min_floor_level: int | None = Query(None, ge=0),
+    furnishing_status: str | None = Query(None),
+    filter_is_commercial: bool | None = Query(None),
+    filter_has_elevator: bool | None = Query(None),
+    filter_has_private_rooftop: bool | None = Query(None),
+    filter_is_two_story_penthouse: bool | None = Query(None),
+    filter_has_private_entrance: bool | None = Query(None),
     prop_cases: PropertyUseCases = Depends(get_property_use_cases)
 ):
-    """
-    Finds and filters approved properties.
-    This endpoint is designed for the future web app.
-    
-    Example: `/properties?property_type=Condominium&min_price=5000000&max_price=10000000`
-    """
-    # No try/except needed! The FastAPI exception handler will catch errors.
     filters = PropertyFilter(
         property_type=property_type,
         min_bedrooms=min_bedrooms,
         max_bedrooms=max_bedrooms,
         min_price=min_price,
         max_price=max_price,
-        condominium_scheme=condo_scheme,
-        location_region=region
+        min_size_sqm=min_size_sqm,
+        max_size_sqm=max_size_sqm,
+        condominium_scheme=condominium_scheme,
+        location_region=location_region,
+        location_site=location_site,
+        min_floor_level=min_floor_level,
+        furnishing_status=furnishing_status,
+        filter_is_commercial=filter_is_commercial,
+        filter_has_elevator=filter_has_elevator,
+        filter_has_private_rooftop=filter_has_private_rooftop,
+        filter_is_two_story_penthouse=filter_is_two_story_penthouse,
+        filter_has_private_entrance=filter_has_private_entrance
     )
     properties = await prop_cases.find_properties(filters)
     return properties
 
+@router.get("/me", response_model=List[Property])
+async def get_my_properties(
+    current_user: User = Depends(get_current_user),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
+):
+    if UserRole.BROKER not in current_user.roles:
+        raise HTTPException(status_code=403, detail="Only brokers can view their listings")
+    return await prop_cases.get_properties_by_broker(current_user.uid)
+
+@router.post("/", response_model=Property)
+async def submit_property_endpoint(
+    property_data: PropertyCreate,
+    current_user: User = Depends(get_current_user),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
+):
+    print("Received data:", property_data.dict())
+    if UserRole.BROKER not in current_user.roles:
+        raise HTTPException(status_code=403, detail="Only brokers can submit properties")
+    property_data.broker_id = current_user.uid
+    property_data.broker_name = current_user.display_name or current_user.phone_number
+    property_data.broker_phone = current_user.phone_number  # 👈 ensure phone is stored
+    return await prop_cases.submit_property(property_data)
 
 @router.get("/{property_id}", response_model=Property)
 async def get_property_by_id_endpoint(
     property_id: str,
     prop_cases: PropertyUseCases = Depends(get_property_use_cases)
 ):
-    """
-    Gets the details for a single property by its ID.
-    Will return a 404 error if the property is not found.
-    """
-    # No try/except needed! The handler will catch PropertyNotFoundError.
     prop = await prop_cases.get_property_details(property_id)
     return prop
+
+@router.post("/upload-images")
+async def upload_images(
+    images: List[UploadFile] = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload property images and return URLs"""
+    if not images:
+        raise HTTPException(status_code=400, detail="No images provided")
+    
+    # Create uploads directory if it doesn't exist
+    upload_dir = "uploads/properties"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    uploaded_urls = []
+    
+    for image in images:
+        # Validate file type
+        if not image.content_type or not image.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail=f"File {image.filename} is not an image")
+        
+        # Generate unique filename
+        file_extension = image.filename.split('.')[-1] if '.' in image.filename else 'jpg'
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        file_path = os.path.join(upload_dir, unique_filename)
+        
+        # Save file
+        try:
+            with open(file_path, "wb") as buffer:
+                content = await image.read()
+                buffer.write(content)
+            
+            # For now, return a placeholder URL
+            # In production, you'd upload to a cloud service like AWS S3, Cloudinary, etc.
+            image_url = f"/uploads/properties/{unique_filename}"
+            uploaded_urls.append(image_url)
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to save image {image.filename}: {str(e)}")
+    
+    return {"urls": uploaded_urls}
+
+@router.post("/convert-telegram-images")
+async def convert_telegram_images(
+    image_urls: List[str],
+    current_user: User = Depends(get_current_user)
+):
+    """Convert Telegram file IDs to proper image URLs"""
+    # For now, return the file IDs as-is with a note
+    # In production, you would implement actual Telegram file URL conversion
+    converted_urls = []
+    for url in image_urls:
+        if url.startswith("AgACAgQAAxkBAAI") or len(url) > 50:
+            # This is a Telegram file ID - for now, return a placeholder
+            converted_urls.append(f"https://via.placeholder.com/400x300?text=Telegram+Image")
+        else:
+            # This is already a proper URL
+            converted_urls.append(url)
+    
+    return {"converted_urls": converted_urls}

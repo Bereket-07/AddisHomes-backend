@@ -1,0 +1,17 @@
+# Git and IDE files
+.git
+.gitignore
+.vscode/
+.idea/
+
+# Python virtual environment and cache
+.venv/
+__pycache__/
+*.pyc
+
+# Local configuration and secrets - DO NOT INCLUDE IN IMAGE
+.env
+
+
+# Documentation
+README.md

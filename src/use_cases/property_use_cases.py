@@ -64,3 +64,7 @@ class PropertyUseCases:
     async def get_analytics_summary(self) -> dict:
         """Retrieves a summary of property counts by status."""
         return await self.repo.count_properties_by_status()
+    async def get_all_properties(self) -> List[Property]:
+        """Admin fetches all properties, regardless of status or broker."""
+        # Using an empty filter to get everything
+        return await self.repo.query_properties(PropertyFilter())
