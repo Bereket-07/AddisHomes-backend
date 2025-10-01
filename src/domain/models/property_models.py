@@ -7,8 +7,8 @@ from .common_models import PropertyType, PropertyStatus, Location, CondoScheme, 
 class PropertyBase(BaseModel):
     property_type: PropertyType
     location: Location
-    bedrooms: int = Field(..., gt=0)
-    bathrooms: int = Field(..., gt=0)
+    bedrooms: int = Field(..., ge=0)
+    bathrooms: int = Field(..., ge=0)
     size_sqm: float = Field(..., gt=0)
     price_etb: float = Field(..., gt=0)
     description: str

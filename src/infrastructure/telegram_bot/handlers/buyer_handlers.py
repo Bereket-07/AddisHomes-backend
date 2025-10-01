@@ -11,8 +11,15 @@ from src.utils.display_utils import create_property_card_text
 from .common_handlers import ensure_user_data, handle_exceptions
 import re
 from src.utils.constants import CONDOMINIUM_SITES, OTHER_OPTION_EN , OTHER_OPTION_AM
+from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
+
+def _resolve_image_url(url: str) -> str:
+    if url and url.startswith('/uploads/'):
+        base = settings.SERVICE_URL or 'http://localhost:8000'
+        return f"{base}{url}"
+    return url
 
 async def show_properties(update: Update, context: ContextTypes.DEFAULT_TYPE, filters: PropertyFilter):
     """
@@ -45,7 +52,7 @@ async def show_properties(update: Update, context: ContextTypes.DEFAULT_TYPE, fi
     # Limit to first 10 results to avoid spamming the user
     for prop in properties[:10]:
         try:
-            media_group = [InputMediaPhoto(media=url) for url in prop.image_urls]
+            media_group = [InputMediaPhoto(media=_resolve_image_url(url)) for url in prop.image_urls]
             prop_details_card = create_property_card_text(prop, for_admin=False)
 
             await context.bot.send_media_group(chat_id=source_message.chat_id, media=media_group)

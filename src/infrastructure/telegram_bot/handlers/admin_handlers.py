@@ -11,8 +11,15 @@ from src.utils.constants import *
 from src.utils.display_utils import create_property_card_text
 from .common_handlers import ensure_user_data, handle_exceptions
 from src.domain.models.common_models import PropertyStatus
+from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
+
+def _resolve_image_url(url: str) -> str:
+    if url and url.startswith('/uploads/'):
+        base = settings.SERVICE_URL or 'http://localhost:8000'
+        return f"{base}{url}"
+    return url
 
 @handle_exceptions
 @ensure_user_data
@@ -44,7 +51,7 @@ async def view_pending_listings(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_text(f"Found {len(pending_props)} pending listings. Please review them below:")
     
     for prop in pending_props:
-        media_group = [InputMediaPhoto(media=url) for url in prop.image_urls]
+        media_group = [InputMediaPhoto(media=_resolve_image_url(url)) for url in prop.image_urls]
         prop_details_card = create_property_card_text(prop, for_admin=True)
         approval_keyboard = keyboards.create_admin_approval_keyboard(prop.pid)
 
@@ -150,7 +157,7 @@ async def manage_listings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Found {len(approved_props)} approved listings to manage:")
     
     for prop in approved_props:
-        media_group = [InputMediaPhoto(media=url) for url in prop.image_urls]
+        media_group = [InputMediaPhoto(media=_resolve_image_url(url)) for url in prop.image_urls]
         prop_details_card = create_property_card_text(prop, for_admin=True)
         management_keyboard = keyboards.create_admin_management_keyboard(prop.pid, lang=user.language)
 

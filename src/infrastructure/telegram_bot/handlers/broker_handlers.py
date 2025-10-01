@@ -9,6 +9,7 @@ from src.utils.i18n import t
 from src.utils.constants import *
 from src.utils.display_utils import create_property_card_text
 from .common_handlers import ensure_user_data, handle_exceptions
+from src.infrastructure.storage_utils import upload_telegram_photo_to_storage
 
 logger = logging.getLogger(__name__)
 
