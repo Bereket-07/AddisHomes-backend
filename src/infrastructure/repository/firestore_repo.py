@@ -7,6 +7,7 @@ from src.domain.models.user_models import User, UserCreate, UserInDB, UserRole
 from google.cloud.firestore_v1.base_query import FieldFilter
 from src.domain.models.property_models import Property, PropertyCreate, PropertyInDB, PropertyFilter, PropertyStatus
 from src.utils.config import settings
+from src.domain.models.car_models import Car, CarCreate, CarInDB, CarFilter, CarStatus
 from src.utils.exceptions import DatabaseError, UserNotFoundError, PropertyNotFoundError
 from src.utils.auth_utils import hash_password ,verify_password, create_access_token
 
@@ -16,6 +17,7 @@ class RealEstateRepository:
         self.db = firestore.AsyncClient()
         self.users_collection = self.db.collection('users')
         self.properties_collection = self.db.collection('properties')
+        self.cars_collection = self.db.collection('cars')
 
     # --- User Methods (Unchanged) ---
     async def get_user_by_telegram_id(self, telegram_id: int) -> Optional[User]:
@@ -226,3 +228,97 @@ class RealEstateRepository:
             return counts
         except GoogleAPICallError as e:
             raise DatabaseError(f"Firestore error while counting properties: {e}")
+
+    async def count_cars_by_status(self) -> dict[CarStatus, int]:
+        """Counts all cars grouped by their status using efficient aggregation."""
+        counts = {status: 0 for status in CarStatus}
+        try:
+            for status in CarStatus:
+                query = self.cars_collection.where('status', '==', status.value)
+                count_query = query.count()
+                query_result = await count_query.get()
+                counts[status] = query_result[0][0].value
+            return counts
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while counting cars: {e}")
+
+    # --- Car Methods ---
+    async def create_car(self, car_data: CarCreate) -> Car:
+        cid = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+        car_in_db = CarInDB(
+            cid=cid,
+            created_at=now,
+            updated_at=now,
+            **car_data.model_dump()
+        )
+        try:
+            await self.cars_collection.document(cid).set(car_in_db.model_dump())
+            return Car(**car_in_db.model_dump())
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while creating car: {e}")
+
+    async def get_car_by_id(self, cid: str) -> Car:
+        try:
+            doc = await self.cars_collection.document(cid).get()
+            if not doc.exists:
+                raise PropertyNotFoundError(identifier=cid)
+            return Car(**doc.to_dict())
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while getting car by ID: {e}")
+
+    async def get_cars_by_broker_id(self, broker_id: str) -> List[Car]:
+        try:
+            docs = self.cars_collection.where('broker_id', '==', broker_id).stream()
+            return [Car(**doc.to_dict()) async for doc in docs]
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while getting cars by broker ID: {e}")
+
+    async def query_cars(self, filters: CarFilter) -> List[Car]:
+        try:
+            query = self.cars_collection.where(filter=FieldFilter('status', '==', CarStatus.APPROVED.value))
+
+            if filters.car_type:
+                query = query.where(filter=FieldFilter('car_type', '==', filters.car_type.value))
+            if filters.min_price:
+                query = query.where(filter=FieldFilter('price_etb', '>=', filters.min_price))
+            if filters.max_price:
+                query = query.where(filter=FieldFilter('price_etb', '<=', filters.max_price))
+
+            docs_stream = query.stream()
+            results = [Car(**doc.to_dict()) async for doc in docs_stream]
+            return results
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while querying cars: {e}")
+
+    async def delete_car(self, cid: str) -> None:
+        doc_ref = self.cars_collection.document(cid)
+        try:
+            if not (await doc_ref.get()).exists:
+                raise PropertyNotFoundError(identifier=cid)
+            await doc_ref.delete()
+            return
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while deleting car: {e}")
+
+    async def update_car_status(self, cid: str, status: CarStatus) -> Car:
+        doc_ref = self.cars_collection.document(cid)
+        try:
+            if not (await doc_ref.get()).exists:
+                raise PropertyNotFoundError(identifier=cid)
+            await doc_ref.update({
+                'status': status.value,
+                'updated_at': datetime.now(timezone.utc)
+            })
+            updated_doc = await doc_ref.get()
+            return Car(**updated_doc.to_dict())
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while updating car status: {e}")
+
+    async def list_all_cars(self) -> List[Car]:
+        """Return all car documents regardless of status for admin views."""
+        try:
+            docs_stream = self.cars_collection.stream()
+            return [Car(**doc.to_dict()) async for doc in docs_stream]
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while listing cars: {e}")

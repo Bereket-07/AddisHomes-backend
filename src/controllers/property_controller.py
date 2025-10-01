@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 from src.use_cases.property_use_cases import PropertyUseCases
 from src.domain.models.property_models import Property, PropertyFilter, PropertyType, CondoScheme, PropertyCreate
+from src.domain.models.car_models import Car, CarCreate, CarFilter, CarType
 from src.app.startup import get_property_use_cases
 from src.controllers.auth_controller import get_current_user
 from src.domain.models.user_models import User, UserRole
@@ -146,3 +147,85 @@ async def convert_telegram_images(
             converted_urls.append(url)
     
     return {"converted_urls": converted_urls}
+
+
+# ===== Car Endpoints =====
+car_router = APIRouter(prefix="/cars", tags=["Cars"])
+
+@car_router.get("/", response_model=List[Car])
+async def find_cars_endpoint(
+    car_type: CarType | None = Query(None),
+    min_price: float | None = Query(None, gt=0),
+    max_price: float | None = Query(None, gt=0),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
+):
+    filters = CarFilter(
+        car_type=car_type,
+        min_price=min_price,
+        max_price=max_price,
+    )
+    return await prop_cases.find_cars(filters)
+
+@car_router.get("/me", response_model=List[Car])
+async def get_my_cars(
+    current_user: User = Depends(get_current_user),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
+):
+    if UserRole.BROKER not in current_user.roles:
+        raise HTTPException(status_code=403, detail="Only brokers can view their car listings")
+    return await prop_cases.get_cars_by_broker(current_user.uid)
+
+@car_router.post("/", response_model=Car)
+async def submit_car_endpoint(
+    car_data: CarCreate,
+    current_user: User = Depends(get_current_user),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
+):
+    if UserRole.BROKER not in current_user.roles:
+        raise HTTPException(status_code=403, detail="Only brokers can submit cars")
+    car_data.broker_id = current_user.uid
+    car_data.broker_name = current_user.display_name or current_user.phone_number
+    car_data.broker_phone = current_user.phone_number
+    return await prop_cases.submit_car(car_data)
+
+@car_router.get("/{car_id}", response_model=Car)
+async def get_car_by_id_endpoint(
+    car_id: str,
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
+):
+    return await prop_cases.get_car_details(car_id)
+
+@car_router.post("/upload-images")
+async def upload_car_images(
+    images: List[UploadFile] = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload car images and return URLs"""
+    if not images:
+        raise HTTPException(status_code=400, detail="No images provided")
+
+    upload_dir = "uploads/cars"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    uploaded_urls: List[str] = []
+
+    for image in images:
+        if not image.content_type or not image.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail=f"File {image.filename} is not an image")
+
+        file_extension = image.filename.split('.')[-1] if '.' in image.filename else 'jpg'
+        unique_filename = f"{uuid.uuid4()}.{file_extension}"
+        file_path = os.path.join(upload_dir, unique_filename)
+
+        try:
+            with open(file_path, "wb") as buffer:
+                content = await image.read()
+                buffer.write(content)
+
+            image_url = f"/uploads/cars/{unique_filename}"
+            uploaded_urls.append(image_url)
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to save image {image.filename}: {str(e)}")
+
+    return {"urls": uploaded_urls}

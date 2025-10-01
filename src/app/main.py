@@ -103,6 +103,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # --- API Routers ---
 app.include_router(property_controller.router)
+app.include_router(property_controller.car_router)
 app.include_router(auth_controller.router)
 app.include_router(admin_controller.router)
 

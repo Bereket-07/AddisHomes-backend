@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from typing import Dict, List
 from src.use_cases.property_use_cases import PropertyUseCases
 from src.domain.models.property_models import Property, PropertyStatus, PropertyCreate
+from src.domain.models.car_models import Car, CarCreate, CarFilter, CarStatus
 from src.app.startup import get_property_use_cases
 from src.controllers.auth_controller import get_current_user
 from src.domain.models.user_models import User, UserRole
@@ -99,18 +100,65 @@ async def mark_as_sold(
 ):
     return await prop_cases.mark_property_as_sold(property_id)
 
-@router.get("/analytics", response_model=Dict[str, int])
+@router.get("/analytics", response_model=Dict[str, Dict[str, int]])
 async def get_analytics(
     current_admin: User = Depends(get_current_admin_user),
     prop_cases: PropertyUseCases = Depends(get_property_use_cases)
 ):
-    analytics = await prop_cases.get_analytics_summary()
-    return {status.value: count for status, count in analytics.items()}
-@router.get("/properties", response_model=List[Property])
-async def get_all_properties(
+    # Return combined analytics including properties and cars
+    return await prop_cases.get_analytics_summary()
+
+# -------------------------
+# Car Management
+# -------------------------
+
+@router.get("/cars", response_model=List[Car])
+async def get_all_cars(
     current_admin: User = Depends(get_current_admin_user),
     prop_cases: PropertyUseCases = Depends(get_property_use_cases)
 ):
-    """Admin can view ALL properties (any status, any broker)."""
-    return await prop_cases.get_all_properties()
+    # Admin needs all cars including pending for moderation
+    return await prop_cases.repo.list_all_cars()
+
+@router.post("/cars/approve/{car_id}", response_model=Car)
+async def approve_car(
+    car_id: str,
+    current_admin: User = Depends(get_current_admin_user),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
+):
+    # update car status to approved
+    return await prop_cases.repo.update_car_status(car_id, CarStatus.APPROVED)
+
+@router.post("/cars/reject/{car_id}", response_model=Car)
+async def reject_car(
+    car_id: str,
+    current_admin: User = Depends(get_current_admin_user),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
+):
+    return await prop_cases.repo.update_car_status(car_id, CarStatus.REJECTED)
+
+@router.post("/cars/mark-sold/{car_id}", response_model=Car)
+async def mark_car_sold(
+    car_id: str,
+    current_admin: User = Depends(get_current_admin_user),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
+):
+    return await prop_cases.repo.update_car_status(car_id, CarStatus.SOLD)
+
+@router.post("/cars", response_model=Car)
+async def create_car_as_admin(
+    car_data: CarCreate,
+    current_admin: User = Depends(get_current_admin_user),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
+):
+    return await prop_cases.submit_car(car_data)
+
+@router.delete("/cars/{car_id}")
+async def delete_car_as_admin(
+    car_id: str,
+    current_admin: User = Depends(get_current_admin_user),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
+):
+    await prop_cases.repo.delete_car(car_id)
+    return {"detail": "Car deleted successfully"}
 

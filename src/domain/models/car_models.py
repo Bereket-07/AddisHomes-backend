@@ -13,10 +13,18 @@ class CarType(str, Enum):
     LUXURY_PREMIUM = "Luxury/Premium"
 
 
+class CarStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SOLD = "sold"
+
+
 class CarBase(BaseModel):
     car_type: CarType
     price_etb: float = Field(..., gt=0)
     images: List[str] = Field(default_factory=list)
+    status: CarStatus = CarStatus.PENDING
 
     # Basics
     manufacturer: Optional[str] = None  # e.g., Toyota

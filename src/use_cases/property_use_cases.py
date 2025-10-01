@@ -2,6 +2,7 @@
 
 from typing import List, Optional
 from src.infrastructure.repository.firestore_repo import RealEstateRepository
+from src.domain.models.car_models import Car, CarCreate, CarFilter, CarStatus
 from src.domain.models.property_models import Property, PropertyCreate, PropertyFilter, PropertyStatus
 from src.utils.exceptions import InvalidOperationError # <<< IMPORT
 
@@ -62,9 +63,31 @@ class PropertyUseCases:
         """Fetches full details for a single property."""
         return await self.repo.get_property_by_id(property_id)
     async def get_analytics_summary(self) -> dict:
-        """Retrieves a summary of property counts by status."""
-        return await self.repo.count_properties_by_status()
+        """Retrieves a summary of property and car counts by status."""
+        prop_counts = await self.repo.count_properties_by_status()
+        car_counts = await self.repo.count_cars_by_status()
+        # serialize enums to string keys
+        return {
+            "properties": {status.value: count for status, count in prop_counts.items()},
+            "cars": {status.value: count for status, count in car_counts.items()},
+        }
     async def get_all_properties(self) -> List[Property]:
         """Admin fetches all properties, regardless of status or broker."""
         # Using an empty filter to get everything
         return await self.repo.query_properties(PropertyFilter())
+
+    # --- Car Use-Cases ---
+    async def submit_car(self, car_data: CarCreate) -> Car:
+        # cars start as pending for admin approval
+        if not getattr(car_data, 'status', None):
+            car_data.status = CarStatus.PENDING
+        return await self.repo.create_car(car_data)
+
+    async def find_cars(self, filters: CarFilter) -> list[Car]:
+        return await self.repo.query_cars(filters)
+
+    async def get_car_details(self, car_id: str) -> Car:
+        return await self.repo.get_car_by_id(car_id)
+
+    async def get_cars_by_broker(self, broker_id: str) -> list[Car]:
+        return await self.repo.get_cars_by_broker_id(broker_id)
