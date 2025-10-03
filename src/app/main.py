@@ -25,6 +25,7 @@ app = FastAPI(
     # redoc_url=None
 )
 
+application = app  # For compatibility with some deployment setups
 # --- Centralized FastAPI Exception Handler ---
 @app.exception_handler(RealEstatePlatformException)
 async def custom_app_exception_handler(request: Request, exc: RealEstatePlatformException):
