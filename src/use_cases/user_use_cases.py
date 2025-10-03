@@ -77,6 +77,39 @@ class UserUseCases:
             return await self.repo.update_user(user_id, {"roles": [r.value for r in updated_roles]})
         
         return user
+
+    # --- Admin: Users Listing & Management ---
+    async def list_users(self) -> list[User]:
+        return await self.repo.list_users()
+
+    async def set_user_role(self, uid: str, role: UserRole, enable: bool) -> User:
+        return await self.repo.set_user_role(uid, role, enable)
+
+    async def set_user_active(self, uid: str, active: bool) -> User:
+        return await self.repo.set_user_active(uid, active)
+
+    async def delete_user(self, uid: str) -> None:
+        return await self.repo.delete_user(uid)
+
+    # --- Profile Management ---
+    async def update_profile(self, uid: str, display_name: str | None, phone_number: str | None) -> User:
+        updates = {}
+        if display_name is not None:
+            updates["display_name"] = display_name
+        if phone_number is not None:
+            updates["phone_number"] = phone_number
+        if not updates:
+            return await self.repo.get_user_by_id(uid)
+        return await self.repo.update_user(uid, updates)
+
+    async def change_password(self, uid: str, current_password: str, new_password: str) -> None:
+        user = await self.repo.get_user_by_id(uid)
+        if not user or not user.hashed_password:
+            raise UserNotFoundError(identifier=uid)
+        if not verify_password(current_password, user.hashed_password):
+            raise UserNotFoundError(identifier="invalid_credentials")
+        new_hash = hash_password(new_password)
+        await self.repo.update_user(uid, {"hashed_password": new_hash})
     async def set_user_language(self, user_id: str, lang_code: str) -> User:
         """Sets the user's preferred language."""
         if lang_code not in translations:

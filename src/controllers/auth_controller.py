@@ -69,3 +69,29 @@ async def get_current_user(token: str = Depends(oauth2_scheme), user_cases: User
 @router.get("/me", response_model=User)
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+# --- Profile Management ---
+class UpdateProfileRequest(BaseModel):
+    display_name: Optional[str] = None
+    phone_number: Optional[str] = None
+
+@router.put("/users/me", response_model=User)
+async def update_profile(
+    req: UpdateProfileRequest,
+    current_user: User = Depends(get_current_user),
+    user_cases: UserUseCases = Depends(get_user_use_cases)
+):
+    return await user_cases.update_profile(current_user.uid, req.display_name, req.phone_number)
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@router.post("/users/change-password")
+async def change_password(
+    req: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    user_cases: UserUseCases = Depends(get_user_use_cases)
+):
+    await user_cases.change_password(current_user.uid, req.current_password, req.new_password)
+    return {"detail": "Password changed"}

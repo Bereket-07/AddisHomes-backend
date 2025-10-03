@@ -2,9 +2,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from typing import Dict, List
 from src.use_cases.property_use_cases import PropertyUseCases
+from src.use_cases.user_use_cases import UserUseCases
 from src.domain.models.property_models import Property, PropertyStatus, PropertyCreate
 from src.domain.models.car_models import Car, CarCreate, CarFilter, CarStatus
-from src.app.startup import get_property_use_cases
+from src.app.startup import get_property_use_cases, get_user_use_cases
 from src.controllers.auth_controller import get_current_user
 from src.domain.models.user_models import User, UserRole
 
@@ -26,6 +27,44 @@ async def get_all_properties(
 ):
     """Admin can view ALL properties (any status, any broker)."""
     return await prop_cases.get_all_properties()
+@router.get("/users", response_model=List[User])
+async def list_users_endpoint(
+    current_admin: User = Depends(get_current_admin_user),
+    user_cases: UserUseCases = Depends(get_user_use_cases)
+):
+    return await user_cases.list_users()
+
+@router.post("/users/{uid}/role")
+async def set_user_role_endpoint(
+    uid: str,
+    payload: Dict[str, object] = Body(...),
+    current_admin: User = Depends(get_current_admin_user),
+    user_cases: UserUseCases = Depends(get_user_use_cases)
+):
+    role = payload.get("role")
+    enable = bool(payload.get("enable"))
+    if role not in [r.value for r in UserRole]:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    return await user_cases.set_user_role(uid, UserRole(role), enable)
+
+@router.post("/users/{uid}/active")
+async def set_user_active_endpoint(
+    uid: str,
+    payload: Dict[str, object] = Body(...),
+    current_admin: User = Depends(get_current_admin_user),
+    user_cases: UserUseCases = Depends(get_user_use_cases)
+):
+    active = bool(payload.get("active"))
+    return await user_cases.set_user_active(uid, active)
+
+@router.delete("/users/{uid}")
+async def delete_user_endpoint(
+    uid: str,
+    current_admin: User = Depends(get_current_admin_user),
+    user_cases: UserUseCases = Depends(get_user_use_cases)
+):
+    await user_cases.delete_user(uid)
+    return {"detail": "User deleted"}
 
 @router.get("/properties/{property_id}", response_model=Property)
 async def get_property_by_id(

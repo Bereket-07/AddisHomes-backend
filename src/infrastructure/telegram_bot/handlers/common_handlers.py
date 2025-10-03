@@ -64,6 +64,12 @@ async def _send_error_response(update: Update, context: ContextTypes.DEFAULT_TYP
             text=message,
             reply_markup=main_menu_keyboard
         )
+        # Add website inline keyboard as a separate message to ensure visibility
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="",
+            reply_markup=keyboards.get_website_inline_keyboard()
+        )
 
 def ensure_user_data(func):
     """
@@ -116,6 +122,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             t('main_menu_prompt'),
             reply_markup=keyboards.get_main_menu_keyboard(user)
         )
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="",
+            reply_markup=keyboards.get_website_inline_keyboard()
+        )
     return ConversationHandler.END
 
 
@@ -147,6 +158,11 @@ async def back_to_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         t('main_menu_prompt'),
         reply_markup=keyboards.get_main_menu_keyboard(user)
     )
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="",
+        reply_markup=keyboards.get_website_inline_keyboard()
+    )
     return ConversationHandler.END
 
 
@@ -163,6 +179,11 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
         t('op_cancelled', default="Operation cancelled. Returning to the main menu."),
         reply_markup=keyboards.get_main_menu_keyboard(user)
     )
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="",
+        reply_markup=keyboards.get_website_inline_keyboard()
+    )
     return ConversationHandler.END
 
 
@@ -174,6 +195,11 @@ async def select_language_start(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_text(
         text=t('select_language_prompt', lang=user.language),
         reply_markup=keyboards.get_language_selection_keyboard()
+    )
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="",
+        reply_markup=keyboards.get_website_inline_keyboard()
     )
 @handle_exceptions
 @ensure_user_data
@@ -191,6 +217,11 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         text=t('language_updated', lang=lang_code, lang_name=chosen_lang),
         reply_markup=keyboards.get_main_menu_keyboard(updated_user)
+    )
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="",
+        reply_markup=keyboards.get_website_inline_keyboard()
     )
 
 @handle_exceptions

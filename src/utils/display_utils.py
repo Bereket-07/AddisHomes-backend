@@ -106,9 +106,15 @@ def create_property_card_text(prop: Property, for_admin: bool = False, for_broke
                       f"**📞 Phone:** `{phone}`\n"
                       f"**💬 Telegram:** {telegram}")
 
+    # --- Website footer ---
+    website_url = settings.WEB_APP_URL or "https://addishomess.com"
+    website_footer = (f"\n\n"
+                      f"🌐 For more properties and cars, visit our website: {website_url}")
+
     card_text = (f"{header}\n"
                  f"➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
                  f"{'\n'.join(details_list)}\n"
                  f"{description}"
-                 f"{extra_info}")
+                 f"{extra_info}"
+                 f"{website_footer}")
     return card_text

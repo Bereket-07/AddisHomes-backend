@@ -101,6 +101,35 @@ class RealEstateRepository:
         except GoogleAPICallError as e:
             raise DatabaseError(f"Firestore error while finding unclaimed admin: {e}")
 
+    # --- Admin: Users Listing & Management ---
+    async def list_users(self) -> List[User]:
+        try:
+            users: List[User] = []
+            docs = self.users_collection.stream()
+            async for doc in docs:
+                users.append(User(**doc.to_dict()))
+            return users
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while listing users: {e}")
+
+    async def set_user_role(self, uid: str, role: UserRole, enable: bool) -> User:
+        user = await self.get_user_by_id(uid)
+        roles = set(user.roles or [])
+        if enable:
+            roles.add(role)
+        else:
+            roles.discard(role)
+        return await self.update_user(uid, {"roles": list(roles)})
+
+    async def set_user_active(self, uid: str, active: bool) -> User:
+        return await self.update_user(uid, {"active": active})
+
+    async def delete_user(self, uid: str) -> None:
+        try:
+            await self.users_collection.document(uid).delete()
+        except GoogleAPICallError as e:
+            raise DatabaseError(f"Firestore error while deleting user: {e}")
+
     # --- Property Methods (Unchanged except query_properties) ---
     async def create_property(self, property_data: PropertyCreate) -> Property:
         pid = str(uuid.uuid4())

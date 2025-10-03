@@ -3,6 +3,7 @@ from src.domain.models.user_models import User, UserRole
 from src.domain.models.property_models import PropertyType, CondoScheme, FurnishingStatus
 from src.utils.i18n import t
 from src.utils.constants import *
+from src.utils.config import settings
 # --- DEPRECATED: No longer need the complex data loader for locations ---
 # from src.utils.data_loader import location_data 
 
@@ -61,6 +62,12 @@ def get_main_menu_keyboard(user: User) -> ReplyKeyboardMarkup:
         options.append(t('admin_panel', lang=lang))
     options.append(t('language_select', lang=lang))
     return create_reply_options_keyboard(options, columns=2, add_cancel=False, lang=lang)
+
+def get_website_inline_keyboard() -> InlineKeyboardMarkup:
+    """Global inline keyboard with a website link."""
+    url = settings.WEB_APP_URL or "https://addishomess.com"
+    keyboard = [[InlineKeyboardButton(text="🌐 Visit our website", url=url)]]
+    return InlineKeyboardMarkup(keyboard)
 
 def get_admin_panel_keyboard(lang: str = 'en') -> ReplyKeyboardMarkup:
     options = [
