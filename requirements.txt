@@ -5,3 +5,5 @@ pydantic-settings
 python-telegram-bot[job-queue]
 google-cloud-firestore
 python-dotenv
+aiomysql
+PyMySQL

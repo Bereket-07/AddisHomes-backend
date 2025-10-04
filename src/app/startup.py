@@ -1,5 +1,5 @@
 import logging
-from src.infrastructure.repository.firestore_repo import RealEstateRepository
+from src.infrastructure.repository.database_factory import get_database_repository
 from src.use_cases.user_use_cases import UserUseCases
 from src.use_cases.property_use_cases import PropertyUseCases
 from src.utils.config import settings
@@ -16,7 +16,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 # ensuring a single point of access to our services.
 
 # Repository Layer
-repo = RealEstateRepository()
+repo = get_database_repository()
 
 # Use Case Layer
 user_use_cases = UserUseCases(repo=repo)

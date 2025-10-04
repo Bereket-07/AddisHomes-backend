@@ -8,7 +8,17 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Real Estate Platform Ethiopia"
     LOG_LEVEL: str = "INFO"
     
-    # Firestore
+    # Database Configuration
+    DATABASE_TYPE: str = os.getenv("DATABASE_TYPE", "mysql")  # "firestore" or "mysql"
+    
+    # MySQL Configuration (for cPanel compatibility)
+    MYSQL_HOST: str = os.getenv("MYSQL_HOST", "localhost")
+    MYSQL_PORT: int = int(os.getenv("MYSQL_PORT", "3306"))
+    MYSQL_USER: str = os.getenv("MYSQL_USER", "root")
+    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "")
+    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "real_estate_platform")
+    
+    # Firestore (legacy support)
     GOOGLE_APPLICATION_CREDENTIALS: str = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
     SERVICE_URL: str = os.getenv("SERVICE_URL")
 
