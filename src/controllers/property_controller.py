@@ -91,42 +91,33 @@ async def get_property_by_id_endpoint(
 @router.post("/upload-images")
 async def upload_images(
     images: List[UploadFile] = File(...),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
 ):
-    """Upload property images and return URLs"""
+    """Upload property images to DB and return served URLs (/images/{id})."""
     if not images:
         raise HTTPException(status_code=400, detail="No images provided")
-    
-    # Create uploads directory if it doesn't exist
-    upload_dir = "uploads/properties"
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    uploaded_urls = []
-    
+
+    # Ensure repo supports blob saving
+    repo = getattr(prop_cases, 'repo', None)
+    if not repo or not hasattr(repo, 'save_image_blob'):
+        raise HTTPException(status_code=500, detail="Image storage not available")
+
+    uploaded_urls: List[str] = []
+
     for image in images:
-        # Validate file type
         if not image.content_type or not image.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail=f"File {image.filename} is not an image")
-        
-        # Generate unique filename
-        file_extension = image.filename.split('.')[-1] if '.' in image.filename else 'jpg'
-        unique_filename = f"{uuid.uuid4()}.{file_extension}"
-        file_path = os.path.join(upload_dir, unique_filename)
-        
-        # Save file
+
+        content = await image.read()
+        image_id = uuid.uuid4().hex
+        content_type = image.content_type
         try:
-            with open(file_path, "wb") as buffer:
-                content = await image.read()
-                buffer.write(content)
-            
-            # For now, return a placeholder URL
-            # In production, you'd upload to a cloud service like AWS S3, Cloudinary, etc.
-            image_url = f"/uploads/properties/{unique_filename}"
-            uploaded_urls.append(image_url)
-            
+            await repo.save_image_blob(image_id=image_id, content_type=content_type, data=content)
+            uploaded_urls.append(f"/images/{image_id}")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save image {image.filename}: {str(e)}")
-    
+            raise HTTPException(status_code=500, detail=f"Failed to store image {image.filename}: {str(e)}")
+
     return {"urls": uploaded_urls}
 
 @router.post("/convert-telegram-images")
@@ -198,14 +189,16 @@ async def get_car_by_id_endpoint(
 @car_router.post("/upload-images")
 async def upload_car_images(
     images: List[UploadFile] = File(...),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    prop_cases: PropertyUseCases = Depends(get_property_use_cases)
 ):
-    """Upload car images and return URLs"""
+    """Upload car images to DB and return served URLs (/images/{id})."""
     if not images:
         raise HTTPException(status_code=400, detail="No images provided")
 
-    upload_dir = "uploads/cars"
-    os.makedirs(upload_dir, exist_ok=True)
+    repo = getattr(prop_cases, 'repo', None)
+    if not repo or not hasattr(repo, 'save_image_blob'):
+        raise HTTPException(status_code=500, detail="Image storage not available")
 
     uploaded_urls: List[str] = []
 
@@ -213,19 +206,13 @@ async def upload_car_images(
         if not image.content_type or not image.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail=f"File {image.filename} is not an image")
 
-        file_extension = image.filename.split('.')[-1] if '.' in image.filename else 'jpg'
-        unique_filename = f"{uuid.uuid4()}.{file_extension}"
-        file_path = os.path.join(upload_dir, unique_filename)
-
+        content = await image.read()
+        image_id = uuid.uuid4().hex
+        content_type = image.content_type
         try:
-            with open(file_path, "wb") as buffer:
-                content = await image.read()
-                buffer.write(content)
-
-            image_url = f"/uploads/cars/{unique_filename}"
-            uploaded_urls.append(image_url)
-
+            await repo.save_image_blob(image_id=image_id, content_type=content_type, data=content)
+            uploaded_urls.append(f"/images/{image_id}")
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save image {image.filename}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to store image {image.filename}: {str(e)}")
 
     return {"urls": uploaded_urls}

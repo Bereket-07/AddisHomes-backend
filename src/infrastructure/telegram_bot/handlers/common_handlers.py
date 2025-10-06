@@ -67,7 +67,7 @@ async def _send_error_response(update: Update, context: ContextTypes.DEFAULT_TYP
         # Add website inline keyboard as a separate message to ensure visibility
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="",
+            text=t('website_cta', default="Visit our website:"),
             reply_markup=keyboards.get_website_inline_keyboard()
         )
 
@@ -112,19 +112,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """
     user = context.user_data['user']
     
+    source_message = update.message or (update.callback_query.message if update.callback_query else None)
     if not user.roles:
-        await update.message.reply_text(
-            t('welcome', name=update.effective_user.first_name),
-            reply_markup=keyboards.get_role_selection_keyboard()
-        )
+        if source_message:
+            await source_message.reply_text(
+                t('welcome', name=update.effective_user.first_name),
+                reply_markup=keyboards.get_role_selection_keyboard()
+            )
     else:
-        await update.message.reply_text(
-            t('main_menu_prompt'),
-            reply_markup=keyboards.get_main_menu_keyboard(user)
-        )
+        if source_message:
+            await source_message.reply_text(
+                t('main_menu_prompt'),
+                reply_markup=keyboards.get_main_menu_keyboard(user)
+            )
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="",
+            text=t('website_cta', default="Visit our website:"),
             reply_markup=keyboards.get_website_inline_keyboard()
         )
     return ConversationHandler.END
@@ -154,13 +157,15 @@ async def set_user_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def back_to_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the 'Back to Main Menu' button click, safely."""
     user = context.user_data['user']
-    await update.message.reply_text(
-        t('main_menu_prompt'),
-        reply_markup=keyboards.get_main_menu_keyboard(user)
-    )
+    source_message = update.message or (update.callback_query.message if update.callback_query else None)
+    if source_message:
+        await source_message.reply_text(
+            t('main_menu_prompt'),
+            reply_markup=keyboards.get_main_menu_keyboard(user)
+        )
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="",
+        text=t('website_cta', default="Visit our website:"),
         reply_markup=keyboards.get_website_inline_keyboard()
     )
     return ConversationHandler.END
@@ -175,13 +180,15 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data.pop('prop_to_reject', None)
 
     user = context.user_data['user']
-    await update.message.reply_text(
-        t('op_cancelled', default="Operation cancelled. Returning to the main menu."),
-        reply_markup=keyboards.get_main_menu_keyboard(user)
-    )
+    source_message = update.message or (update.callback_query.message if update.callback_query else None)
+    if source_message:
+        await source_message.reply_text(
+            t('op_cancelled', default="Operation cancelled. Returning to the main menu."),
+            reply_markup=keyboards.get_main_menu_keyboard(user)
+        )
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="",
+        text=t('website_cta', default="Visit our website:"),
         reply_markup=keyboards.get_website_inline_keyboard()
     )
     return ConversationHandler.END
@@ -192,13 +199,15 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def select_language_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Shows the language selection menu."""
     user = context.user_data['user']
-    await update.message.reply_text(
-        text=t('select_language_prompt', lang=user.language),
-        reply_markup=keyboards.get_language_selection_keyboard()
-    )
+    source_message = update.message or (update.callback_query.message if update.callback_query else None)
+    if source_message:
+        await source_message.reply_text(
+            text=t('select_language_prompt', lang=user.language),
+            reply_markup=keyboards.get_language_selection_keyboard()
+        )
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="",
+        text=t('website_cta', default="Visit our website:"),
         reply_markup=keyboards.get_website_inline_keyboard()
     )
 @handle_exceptions
@@ -214,13 +223,15 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     updated_user = await user_use_cases.set_user_language(user.uid, lang_code)
     context.user_data['user'] = updated_user # IMPORTANT: Update context
     
-    await update.message.reply_text(
-        text=t('language_updated', lang=lang_code, lang_name=chosen_lang),
-        reply_markup=keyboards.get_main_menu_keyboard(updated_user)
-    )
+    source_message = update.message or (update.callback_query.message if update.callback_query else None)
+    if source_message:
+        await source_message.reply_text(
+            text=t('language_updated', lang=lang_code, lang_name=chosen_lang),
+            reply_markup=keyboards.get_main_menu_keyboard(updated_user)
+        )
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="",
+        text=t('website_cta', default="Visit our website:"),
         reply_markup=keyboards.get_website_inline_keyboard()
     )
 
@@ -245,10 +256,12 @@ async def handle_stuck_conversation(update: Update, context: ContextTypes.DEFAUL
     user = context.user_data['user']
     
     # Send a helpful message explaining what happened.
-    await update.message.reply_text(
-        text=t('stuck_conversation_message', lang=user.language, default="It looks like that action is no longer valid. Let's go back to the main menu to start fresh."),
-        reply_markup=keyboards.get_main_menu_keyboard(user)
-    )
+    source_message = update.message or (update.callback_query.message if update.callback_query else None)
+    if source_message:
+        await source_message.reply_text(
+            text=t('stuck_conversation_message', lang=user.language, default="It looks like that action is no longer valid. Let's go back to the main menu to start fresh."),
+            reply_markup=keyboards.get_main_menu_keyboard(user)
+        )
     
     # Officially end the conversation.
     return ConversationHandler.END

@@ -2,7 +2,7 @@ import asyncio
 import logging
 import uvicorn
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from telegram import Update
@@ -11,6 +11,7 @@ import os
 from src.utils.config import settings
 from src.controllers import property_controller, auth_controller, admin_controller
 from src.infrastructure.telegram_bot.bot import setup_bot_application
+from src.infrastructure.repository.mysql_repo import MySQLRealEstateRepository
 from src.app.startup import user_use_cases, property_use_cases
 from src.utils.exceptions import RealEstatePlatformException, NotFoundError
 
@@ -112,6 +113,26 @@ app.include_router(admin_controller.router)
 def health_check():
     """A simple endpoint to confirm the API is running."""
     return {"status": "ok", "project": settings.PROJECT_NAME, "version": "1.0.0"}
+
+# --- Image Serving Endpoint (DB Blob) ---
+repo_for_images = None
+try:
+    # Only available if using MySQL repo
+    if hasattr(property_use_cases.repo, 'get_image_blob'):
+        repo_for_images = property_use_cases.repo
+except Exception:
+    pass
+
+@app.get("/images/{image_id}")
+async def serve_image(image_id: str):
+    if not repo_for_images:
+        return Response(status_code=404)
+    record = await repo_for_images.get_image_blob(image_id)
+    if not record:
+        return Response(status_code=404)
+    content_type = record.get('content_type', 'application/octet-stream')
+    data = record.get('data')
+    return Response(content=data, media_type=content_type)
 
 # --- Main Execution ---
 if __name__ == "__main__":

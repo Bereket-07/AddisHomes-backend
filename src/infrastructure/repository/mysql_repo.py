@@ -24,26 +24,81 @@ class MySQLRealEstateRepository:
             'autocommit': True
         }
 
+    async def _reset_pool(self):
+        try:
+            if self.pool is not None:
+                self.pool.close()
+                await self.pool.wait_closed()
+        finally:
+            self.pool = None
+
     async def _get_connection(self):
-        """Get a connection from the pool"""
+        """Get a connection from the pool (with lazy init and ping)."""
         if self.pool is None:
             self.pool = await aiomysql.create_pool(**self._connection_params, minsize=1, maxsize=10)
-        return await self.pool.acquire()
+        conn = await self.pool.acquire()
+        # Attempt to ping the server; if it fails, reset pool and reconnect
+        try:
+            await conn.ping()
+        except Exception:
+            await self._reset_pool()
+            self.pool = await aiomysql.create_pool(**self._connection_params, minsize=1, maxsize=10)
+            conn = await self.pool.acquire()
+        return conn
 
     async def _execute_query(self, query: str, params: tuple = None, fetch_one: bool = False, fetch_all: bool = False):
-        """Execute a query and return results"""
-        conn = await self._get_connection()
-        try:
-            async with conn.cursor(aiomysql.DictCursor) as cursor:
-                await cursor.execute(query, params)
-                if fetch_one:
-                    return await cursor.fetchone()
-                elif fetch_all:
-                    return await cursor.fetchall()
-                else:
-                    return cursor.lastrowid
-        finally:
-            self.pool.release(conn)
+        """Execute a query and return results (with one reconnect retry on server-lost)."""
+        attempts = 0
+        while True:
+            attempts += 1
+            conn = await self._get_connection()
+            try:
+                async with conn.cursor(aiomysql.DictCursor) as cursor:
+                    await cursor.execute(query, params)
+                    if fetch_one:
+                        return await cursor.fetchone()
+                    elif fetch_all:
+                        return await cursor.fetchall()
+                    else:
+                        return cursor.lastrowid
+            except Exception as e:
+                # Detect MySQL server lost/gone away (2013/2006) and retry once
+                code = getattr(e, 'args', [None])[0]
+                if attempts < 2 and code in (2006, 2013):
+                    await self._reset_pool()
+                    continue
+                raise
+            finally:
+                try:
+                    self.pool.release(conn)
+                except Exception:
+                    pass
+
+    # --- Image Blob Methods ---
+    async def _ensure_images_table(self):
+        """Create images table if it does not exist."""
+        create_table_sql = (
+            """
+            CREATE TABLE IF NOT EXISTS images (
+                image_id VARCHAR(64) PRIMARY KEY,
+                content_type VARCHAR(255) NOT NULL,
+                data LONGBLOB NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            """
+        )
+        await self._execute_query(create_table_sql)
+
+    async def save_image_blob(self, image_id: str, content_type: str, data: bytes) -> None:
+        await self._ensure_images_table()
+        insert_sql = "INSERT INTO images (image_id, content_type, data) VALUES (%s, %s, %s)"
+        await self._execute_query(insert_sql, (image_id, content_type, data))
+
+    async def get_image_blob(self, image_id: str) -> Optional[Dict[str, Any]]:
+        await self._ensure_images_table()
+        select_sql = "SELECT content_type, data FROM images WHERE image_id = %s"
+        result = await self._execute_query(select_sql, (image_id,), fetch_one=True)
+        return result
 
     # --- User Methods ---
     async def get_user_by_telegram_id(self, telegram_id: int) -> Optional[User]:
@@ -153,9 +208,10 @@ class MySQLRealEstateRepository:
                     params.append(value)
             
             if set_clauses:
+                # Order of params must match placeholders: SET ..., updated_at = %s WHERE uid = %s
+                params.append(datetime.now(timezone.utc))
                 params.append(uid)
                 query = f"UPDATE users SET {', '.join(set_clauses)}, updated_at = %s WHERE uid = %s"
-                params.append(datetime.now(timezone.utc))
                 await self._execute_query(query, tuple(params))
             
             # Handle roles update
@@ -364,9 +420,10 @@ class MySQLRealEstateRepository:
                 params.append(value)
             
             if set_clauses:
+                # Order of params must match placeholders: SET ..., updated_at = %s WHERE pid = %s
+                params.append(datetime.now(timezone.utc))
                 params.append(pid)
                 query = f"UPDATE properties SET {', '.join(set_clauses)}, updated_at = %s WHERE pid = %s"
-                params.append(datetime.now(timezone.utc))
                 await self._execute_query(query, tuple(params))
             
             return await self.get_property_by_id(pid)

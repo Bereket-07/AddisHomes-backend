@@ -16,7 +16,7 @@ from src.utils.config import settings
 logger = logging.getLogger(__name__)
 
 def _resolve_image_url(url: str) -> str:
-    if url and url.startswith('/uploads/'):
+    if url and (url.startswith('/uploads/') or url.startswith('/images/')):
         base = settings.SERVICE_URL or 'http://localhost:8000'
         return f"{base}{url}"
     return url
@@ -52,15 +52,33 @@ async def show_properties(update: Update, context: ContextTypes.DEFAULT_TYPE, fi
     # Limit to first 10 results to avoid spamming the user
     for prop in properties[:10]:
         try:
-            media_group = [InputMediaPhoto(media=_resolve_image_url(url)) for url in prop.image_urls]
+            resolved_urls = [_resolve_image_url(url) for url in prop.image_urls]
             prop_details_card = create_property_card_text(prop, for_admin=False)
 
-            await context.bot.send_media_group(chat_id=source_message.chat_id, media=media_group)
-            await context.bot.send_message(
-                chat_id=source_message.chat_id,
-                text=prop_details_card,
-                parse_mode='Markdown'
-            )
+            if not resolved_urls:
+                await context.bot.send_message(
+                    chat_id=source_message.chat_id,
+                    text=prop_details_card,
+                    parse_mode='Markdown'
+                )
+            elif len(resolved_urls) == 1:
+                await context.bot.send_photo(
+                    chat_id=source_message.chat_id,
+                    photo=resolved_urls[0]
+                )
+                await context.bot.send_message(
+                    chat_id=source_message.chat_id,
+                    text=prop_details_card,
+                    parse_mode='Markdown'
+                )
+            else:
+                media_group = [InputMediaPhoto(media=url) for url in resolved_urls]
+                await context.bot.send_media_group(chat_id=source_message.chat_id, media=media_group)
+                await context.bot.send_message(
+                    chat_id=source_message.chat_id,
+                    text=prop_details_card,
+                    parse_mode='Markdown'
+                )
         except Exception as e:
             logger.error(f"Failed to send property card {prop.pid}: {e}")
             await context.bot.send_message(
@@ -304,12 +322,18 @@ async def receive_filter_bedrooms(update: Update, context: ContextTypes.DEFAULT_
 async def end_filter_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Helper function to finalize the filtering conversation."""
     user: User = context.user_data['user']
-    final_filters = PropertyFilter(**context.user_data['filters'])
+    filters_dict = context.user_data.get('filters') or {}
+    try:
+        final_filters = PropertyFilter(**filters_dict)
+    except Exception:
+        final_filters = PropertyFilter()
     await show_properties(update, context, final_filters)
-    await update.message.reply_text(
-        text=t('search_complete', lang=user.language),
-        reply_markup=keyboards.get_main_menu_keyboard(user)
-    )
+    source_message = update.message or (update.callback_query.message if update.callback_query else None)
+    if source_message:
+        await source_message.reply_text(
+            text=t('search_complete', lang=user.language),
+            reply_markup=keyboards.get_main_menu_keyboard(user)
+        )
     context.user_data.pop('filters', None)
     return ConversationHandler.END
 

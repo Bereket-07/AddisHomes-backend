@@ -10,6 +10,7 @@ from src.utils.constants import *
 from src.utils.display_utils import create_property_card_text
 from .common_handlers import ensure_user_data, handle_exceptions
 from src.infrastructure.storage_utils import upload_telegram_photo_to_storage
+from src.utils.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -383,7 +384,9 @@ async def receive_images(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     file_id = photo.file_id
 
     # Upload to Firebase Storage and get permanent URL
-    public_url = await upload_telegram_photo_to_storage(context.bot, file_id)
+    # Pass repo to ensure DB blob storage
+    repo = context.bot_data.get("property_use_cases").repo if context.bot_data.get("property_use_cases") else None
+    public_url = await upload_telegram_photo_to_storage(context.bot, file_id, repo=repo)
 
     # Store the permanent URL instead of file_id
     context.user_data['submission_data']['image_urls'].append(public_url)
@@ -453,17 +456,41 @@ async def my_listings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     await update.message.reply_text(t('displaying_your_listings', lang=user.language, default="Displaying your submitted properties:"))
     
+    def _resolve_image_url(url: str) -> str:
+        if url and (url.startswith('/uploads/') or url.startswith('/images/')):
+            base = settings.SERVICE_URL or 'http://localhost:8000'
+            return f"{base}{url}"
+        return url
+
     for prop in listings:
-        media_group = [InputMediaPhoto(media=url) for url in prop.image_urls]
+        resolved_urls = [_resolve_image_url(url) for url in prop.image_urls]
         prop_details_card = create_property_card_text(prop, for_broker=True)
 
         try:
-            await context.bot.send_media_group(chat_id=update.effective_chat.id, media=media_group)
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=prop_details_card,
-                parse_mode='Markdown'
-            )
+            if not resolved_urls:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=prop_details_card,
+                    parse_mode='Markdown'
+                )
+            elif len(resolved_urls) == 1:
+                await context.bot.send_photo(
+                    chat_id=update.effective_chat.id,
+                    photo=resolved_urls[0]
+                )
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=prop_details_card,
+                    parse_mode='Markdown'
+                )
+            else:
+                media_group = [InputMediaPhoto(media=url) for url in resolved_urls]
+                await context.bot.send_media_group(chat_id=update.effective_chat.id, media=media_group)
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=prop_details_card,
+                    parse_mode='Markdown'
+                )
         except Exception as e:
             logger.error(f"Failed to send rich card for broker's property {prop.pid}: {e}")
             await context.bot.send_message(

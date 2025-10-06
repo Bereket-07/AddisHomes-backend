@@ -16,7 +16,7 @@ from src.utils.config import settings
 logger = logging.getLogger(__name__)
 
 def _resolve_image_url(url: str) -> str:
-    if url and url.startswith('/uploads/'):
+    if url and (url.startswith('/uploads/') or url.startswith('/images/')):
         base = settings.SERVICE_URL or 'http://localhost:8000'
         return f"{base}{url}"
     return url
@@ -50,18 +50,50 @@ async def view_pending_listings(update: Update, context: ContextTypes.DEFAULT_TY
 
     await update.message.reply_text(f"Found {len(pending_props)} pending listings. Please review them below:")
     
+    user_cases: UserUseCases = context.bot_data["user_use_cases"]
+
     for prop in pending_props:
-        media_group = [InputMediaPhoto(media=_resolve_image_url(url)) for url in prop.image_urls]
+        resolved_urls = [_resolve_image_url(url) for url in prop.image_urls]
         prop_details_card = create_property_card_text(prop, for_admin=True)
+        # Append broker contact info (admin-only)
+        broker_user = await user_cases.get_user_by_id(prop.broker_id) if prop.broker_id else None
+        contact_lines = "\n\n**Broker Contact:**"
+        # Phone preference: property-specific phone if present, else user's phone_number
+        phone_val = prop.broker_phone or (getattr(broker_user, 'phone_number', None) or '')
+        if phone_val:
+            contact_lines += f"\n**📞 Phone:** `{phone_val}`"
+        if broker_user and getattr(broker_user, 'telegram_id', None):
+            contact_lines += f"\n**💬 Telegram:** [Open chat](tg://user?id={broker_user.telegram_id})"
+        prop_details_with_contact = f"{prop_details_card}{contact_lines}"
         approval_keyboard = keyboards.create_admin_approval_keyboard(prop.pid)
 
-        await context.bot.send_media_group(chat_id=update.effective_chat.id, media=media_group)
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=prop_details_card,
-            parse_mode='Markdown',
-            reply_markup=approval_keyboard
-        )
+        if not resolved_urls:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=prop_details_with_contact,
+                parse_mode='Markdown',
+                reply_markup=approval_keyboard
+            )
+        elif len(resolved_urls) == 1:
+            await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=resolved_urls[0]
+            )
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=prop_details_with_contact,
+                parse_mode='Markdown',
+                reply_markup=approval_keyboard
+            )
+        else:
+            media_group = [InputMediaPhoto(media=url) for url in resolved_urls]
+            await context.bot.send_media_group(chat_id=update.effective_chat.id, media=media_group)
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=prop_details_with_contact,
+                parse_mode='Markdown',
+                reply_markup=approval_keyboard
+            )
     
     await update.message.reply_text(
         "End of pending list.",
@@ -143,6 +175,7 @@ async def manage_listings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("Admin requested to manage listings.")
     prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
     user = context.user_data['user']
+    user_cases: UserUseCases = context.bot_data["user_use_cases"]
     
     # We'll find properties with the 'approved' status
     approved_props = await prop_cases.find_properties(PropertyFilter(status=PropertyStatus.APPROVED)) # We need to modify find_properties for this
@@ -157,17 +190,46 @@ async def manage_listings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Found {len(approved_props)} approved listings to manage:")
     
     for prop in approved_props:
-        media_group = [InputMediaPhoto(media=_resolve_image_url(url)) for url in prop.image_urls]
+        resolved_urls = [_resolve_image_url(url) for url in prop.image_urls]
         prop_details_card = create_property_card_text(prop, for_admin=True)
+        # Append broker contact info (admin-only)
+        broker_user = await user_cases.get_user_by_id(prop.broker_id) if prop.broker_id else None
+        contact_lines = "\n\n**Broker Contact:**"
+        phone_val = prop.broker_phone or (getattr(broker_user, 'phone_number', None) or '')
+        if phone_val:
+            contact_lines += f"\n**📞 Phone:** `{phone_val}`"
+        if broker_user and getattr(broker_user, 'telegram_id', None):
+            contact_lines += f"\n**💬 Telegram:** [Open chat](tg://user?id={broker_user.telegram_id})"
+        prop_details_with_contact = f"{prop_details_card}{contact_lines}"
         management_keyboard = keyboards.create_admin_management_keyboard(prop.pid, lang=user.language)
 
-        await context.bot.send_media_group(chat_id=update.effective_chat.id, media=media_group)
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=prop_details_card,
-            parse_mode='Markdown',
-            reply_markup=management_keyboard
-        )
+        if not resolved_urls:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=prop_details_with_contact,
+                parse_mode='Markdown',
+                reply_markup=management_keyboard
+            )
+        elif len(resolved_urls) == 1:
+            await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=resolved_urls[0]
+            )
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=prop_details_with_contact,
+                parse_mode='Markdown',
+                reply_markup=management_keyboard
+            )
+        else:
+            media_group = [InputMediaPhoto(media=url) for url in resolved_urls]
+            await context.bot.send_media_group(chat_id=update.effective_chat.id, media=media_group)
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=prop_details_with_contact,
+                parse_mode='Markdown',
+                reply_markup=management_keyboard
+            )
 @handle_exceptions
 @ensure_user_data
 async def mark_as_sold(update: Update, context: ContextTypes.DEFAULT_TYPE):

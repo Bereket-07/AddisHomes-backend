@@ -5,6 +5,7 @@ from telegram.ext import (
     ConversationHandler
 )
 from src.utils.config import settings
+from telegram.request import HTTPXRequest
 from src.utils.i18n import t, create_i18n_regex
 from src.utils.constants import * # Import all constants
 from src.use_cases.user_use_cases import UserUseCases
@@ -15,7 +16,9 @@ from .handlers import (
 
 def setup_bot_application(user_cases: UserUseCases, prop_cases: PropertyUseCases) -> Application:
     """Creates and configures the Telegram bot application."""
-    builder = Application.builder().token(settings.TELEGRAM_BOT_TOKEN)
+    # Increase HTTP timeouts to reduce Telegram API read/connect timeouts
+    httpx_request = HTTPXRequest(connect_timeout=30.0, read_timeout=30.0, write_timeout=30.0, pool_timeout=30.0)
+    builder = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).request(httpx_request)
     application = builder.build()
     application.bot_data["user_use_cases"] = user_cases
     application.bot_data["property_use_cases"] = prop_cases
