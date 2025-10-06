@@ -21,11 +21,13 @@ class Settings(BaseSettings):
     # Firestore (legacy support)
     GOOGLE_APPLICATION_CREDENTIALS: str = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
     SERVICE_URL: str = os.getenv("SERVICE_URL")
+    PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "")
 
     # Telegram
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN")
     ADMIN_TG_USERNAME: str = os.getenv("ADMIN_TG_USERNAME")  # Default to a placeholder if not set
     WEB_APP_URL: str = "https://realestate.et"
+    FRONTEND_ORIGIN: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
     
     # Admin
     ADMIN_PHONE_NUMBER: str

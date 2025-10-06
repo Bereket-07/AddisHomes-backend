@@ -41,9 +41,20 @@ async def custom_app_exception_handler(request: Request, exc: RealEstatePlatform
         content={"detail": exc.message},
     )
 
+# --- CORS ---
+# If credentials are allowed, we must specify explicit origins (no "*")
+frontend_origin = getattr(settings, 'FRONTEND_ORIGIN', "http://localhost:5173")
+service_origin = settings.WEB_APP_URL if hasattr(settings, 'WEB_APP_URL') and settings.WEB_APP_URL else None
+public_base = getattr(settings, 'PUBLIC_BASE_URL', None)
+allowed_origins = [frontend_origin]
+if service_origin:
+    allowed_origins.append(service_origin)
+if public_base:
+    allowed_origins.append(public_base)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

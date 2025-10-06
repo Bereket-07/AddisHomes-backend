@@ -7,11 +7,19 @@ from src.utils.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+def _truncate_bcrypt(password: str) -> str:
+    """Bcrypt only considers first 72 bytes; safely truncate to avoid backend errors."""
+    try:
+        # encode to bytes, slice 72 bytes, then decode ignoring errors
+        return password.encode("utf-8")[:72].decode("utf-8", errors="ignore")
+    except Exception:
+        return password[:72]
+
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return pwd_context.hash(_truncate_bcrypt(password))
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return pwd_context.verify(_truncate_bcrypt(plain_password), hashed_password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()

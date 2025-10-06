@@ -16,10 +16,26 @@ from src.utils.config import settings
 logger = logging.getLogger(__name__)
 
 def _resolve_image_url(url: str) -> str:
-    if url and (url.startswith('/uploads/') or url.startswith('/images/')):
-        base = settings.SERVICE_URL or 'http://localhost:8000'
+    if not url:
+        return url
+    # Normalize missing leading slash for relative paths
+    if url.startswith('uploads/'):
+        url = f"/{url}"
+    if url.startswith('images/'):
+        url = f"/{url}"
+    # Prefix backend base for server-relative image paths
+    if url.startswith('/uploads/') or url.startswith('/images/'):
+        base = settings.SERVICE_URL or getattr(settings, 'PUBLIC_BASE_URL', None) or 'http://localhost:8000'
+        # Ensure scheme present (prefer https for Telegram fetching)
+        if base and not base.startswith('http://') and not base.startswith('https://'):
+            base = f"https://{base}"
         return f"{base}{url}"
     return url
+
+def _is_valid_photo_url(url: str) -> bool:
+    if not url:
+        return False
+    return url.startswith('http://') or url.startswith('https://')
 
 async def show_properties(update: Update, context: ContextTypes.DEFAULT_TYPE, filters: PropertyFilter):
     """
@@ -53,31 +69,46 @@ async def show_properties(update: Update, context: ContextTypes.DEFAULT_TYPE, fi
     for prop in properties[:10]:
         try:
             resolved_urls = [_resolve_image_url(url) for url in prop.image_urls]
+            # Keep only absolute http(s) URLs for Telegram
+            resolved_urls = [u for u in resolved_urls if _is_valid_photo_url(u)]
+            # Telegram allows up to 10 in media group; keep a safe small number
+            if len(resolved_urls) > 10:
+                resolved_urls = resolved_urls[:10]
+            logger.info(f"Telegram sending property {prop.pid} with {len(resolved_urls)} image(s): {resolved_urls}")
             prop_details_card = create_property_card_text(prop, for_admin=False)
 
             if not resolved_urls:
                 await context.bot.send_message(
                     chat_id=source_message.chat_id,
                     text=prop_details_card,
-                    parse_mode='Markdown'
+                    parse_mode='Markdown',
+                    disable_web_page_preview=True
                 )
             elif len(resolved_urls) == 1:
-                await context.bot.send_photo(
-                    chat_id=source_message.chat_id,
-                    photo=resolved_urls[0]
-                )
+                try:
+                    await context.bot.send_photo(
+                        chat_id=source_message.chat_id,
+                        photo=resolved_urls[0]
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send photo for property {prop.pid}: {e}. Falling back to text only.")
                 await context.bot.send_message(
                     chat_id=source_message.chat_id,
                     text=prop_details_card,
-                    parse_mode='Markdown'
+                    parse_mode='Markdown',
+                    disable_web_page_preview=True
                 )
             else:
-                media_group = [InputMediaPhoto(media=url) for url in resolved_urls]
-                await context.bot.send_media_group(chat_id=source_message.chat_id, media=media_group)
+                try:
+                    media_group = [InputMediaPhoto(media=url) for url in resolved_urls]
+                    await context.bot.send_media_group(chat_id=source_message.chat_id, media=media_group)
+                except Exception as e:
+                    logger.error(f"Failed to send media group for property {prop.pid}: {e}. Falling back to text only.")
                 await context.bot.send_message(
                     chat_id=source_message.chat_id,
                     text=prop_details_card,
-                    parse_mode='Markdown'
+                    parse_mode='Markdown',
+                    disable_web_page_preview=True
                 )
         except Exception as e:
             logger.error(f"Failed to send property card {prop.pid}: {e}")
