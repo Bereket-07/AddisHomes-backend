@@ -52,10 +52,9 @@ if service_origin:
 if public_base:
     allowed_origins.append(public_base)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+app.add_middleware( 
+    CORSMiddleware, 
+    allow_origins=["*"], # TEMPORARY: For debugging only! allow_credentials=True, 
     allow_methods=["*"],
     allow_headers=["*"],
 )
