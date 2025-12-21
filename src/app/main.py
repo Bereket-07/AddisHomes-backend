@@ -80,12 +80,7 @@ def create_app():
             content_type = record.get('content_type', 'application/octet-stream')
             data = record.get('data')
             
-            return send_file(
-                io.BytesIO(data),
-                mimetype=content_type,
-                as_attachment=False,
-                download_name=f"{image_id}" 
-            )
+            return Response(data, mimetype=content_type)
         except Exception as e:
             logger.error(f"Error serving image {image_id}: {e}")
             return jsonify({"detail": "Internal Server Error"}), 500
