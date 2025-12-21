@@ -73,7 +73,7 @@ if __name__ == "__main__":
     if success:
         print("\n🎉 Your system is ready to use MySQL!")
         print("\nTo start your application:")
-        print("python -m uvicorn src.app.main:app --reload")
+        print("python src/app/main.py")
     else:
         print("\n❌ Please fix the issues above before proceeding")
         print("\nMake sure your .env file has the correct MySQL settings")

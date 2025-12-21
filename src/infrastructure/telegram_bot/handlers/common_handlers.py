@@ -24,7 +24,7 @@ def handle_exceptions(func):
         try:
             # Try to execute the actual handler function
             return await func(update, context, *args, **kwargs)
-        
+
         except RealEstatePlatformException as e:
             # Handle our custom application exceptions
             logger.error(f"Custom exception in handler '{func.__name__}': {e}", exc_info=True)
@@ -45,7 +45,7 @@ def handle_exceptions(func):
             user_message = "An unexpected error occurred. Our team has been notified. Please try again later."
             await _send_error_response(update, context, user_message)
             return ConversationHandler.END
-            
+
     return wrapper
 
 async def _send_error_response(update: Update, context: ContextTypes.DEFAULT_TYPE, message: str):
@@ -54,7 +54,7 @@ async def _send_error_response(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data.pop('submission_data', None)
     context.user_data.pop('filters', None)
     context.user_data.pop('prop_to_reject', None)
-    
+
     user = context.user_data.get('user')
     main_menu_keyboard = keyboards.get_main_menu_keyboard(user) if user else keyboards.get_role_selection_keyboard()
 
@@ -111,7 +111,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     Handles the /start command. The decorator ensures user data is loaded.
     """
     user = context.user_data['user']
-    
+
     source_message = update.message or (update.callback_query.message if update.callback_query else None)
     if not user.roles:
         if source_message:
@@ -139,13 +139,13 @@ async def set_user_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the role selection from the first-time menu."""
     role_text = update.message.text
     role = UserRole.BUYER if role_text == t('buyer_role') else UserRole.BROKER
-    
+
     user = context.user_data['user']
     user_use_cases: UserUseCases = context.bot_data["user_use_cases"]
-    
+
     updated_user = await user_use_cases.add_user_role(user.uid, role)
     context.user_data['user'] = updated_user
-    
+
     await update.message.reply_text(
         f"You are now registered as a {role.value}!",
         reply_markup=keyboards.get_main_menu_keyboard(updated_user)
@@ -219,10 +219,10 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chosen_lang = update.message.text
     lang_code = 'am' if 'አማርኛ' in chosen_lang else 'en'
-    
+
     updated_user = await user_use_cases.set_user_language(user.uid, lang_code)
     context.user_data['user'] = updated_user # IMPORTANT: Update context
-    
+
     source_message = update.message or (update.callback_query.message if update.callback_query else None)
     if source_message:
         await source_message.reply_text(
@@ -254,7 +254,7 @@ async def handle_stuck_conversation(update: Update, context: ContextTypes.DEFAUL
     context.user_data.pop('prop_to_reject', None)
 
     user = context.user_data['user']
-    
+
     # Send a helpful message explaining what happened.
     source_message = update.message or (update.callback_query.message if update.callback_query else None)
     if source_message:
@@ -262,6 +262,5 @@ async def handle_stuck_conversation(update: Update, context: ContextTypes.DEFAUL
             text=t('stuck_conversation_message', lang=user.language, default="It looks like that action is no longer valid. Let's go back to the main menu to start fresh."),
             reply_markup=keyboards.get_main_menu_keyboard(user)
         )
-    
+
     # Officially end the conversation.
-    return ConversationHandler.END

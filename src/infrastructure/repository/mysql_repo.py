@@ -1,19 +1,18 @@
 import uuid
-import asyncio
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
-import aiomysql
-from src.domain.models.user_models import User, UserCreate, UserInDB, UserRole
-from src.domain.models.property_models import Property, PropertyCreate, PropertyInDB, PropertyFilter, PropertyStatus
-from src.domain.models.car_models import Car, CarCreate, CarInDB, CarFilter, CarStatus
+import pymysql
+import pymysql.cursors
+from src.domain.models.user_models import User, UserCreate, UserRole
+from src.domain.models.property_models import Property, PropertyCreate, PropertyFilter, PropertyStatus
+from src.domain.models.car_models import Car, CarCreate, CarFilter, CarStatus
 from src.utils.exceptions import DatabaseError, UserNotFoundError, PropertyNotFoundError
-from src.utils.auth_utils import hash_password, verify_password, create_access_token
+from src.utils.auth_utils import hash_password
 from src.utils.config import settings
 
 
 class MySQLRealEstateRepository:
     def __init__(self):
-        self.pool = None
         self._connection_params = {
             'host': settings.MYSQL_HOST,
             'port': settings.MYSQL_PORT,
@@ -21,61 +20,36 @@ class MySQLRealEstateRepository:
             'password': settings.MYSQL_PASSWORD,
             'db': settings.MYSQL_DATABASE,
             'charset': 'utf8mb4',
-            'autocommit': True
+            'autocommit': True,
+            'cursorclass': pymysql.cursors.DictCursor
         }
 
-    async def _reset_pool(self):
+    def _get_connection(self):
+        """Get a fresh connection."""
         try:
-            if self.pool is not None:
-                self.pool.close()
-                await self.pool.wait_closed()
+            return pymysql.connect(**self._connection_params)
+        except Exception as e:
+            raise DatabaseError(f"Failed to connect to MySQL: {e}")
+
+    def _execute_query(self, query: str, params: tuple = None, fetch_one: bool = False, fetch_all: bool = False):
+        """Execute a query and return results."""
+        conn = self._get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, params)
+                if fetch_one:
+                    return cursor.fetchone()
+                elif fetch_all:
+                    return cursor.fetchall()
+                else:
+                    return cursor.lastrowid
+        except Exception as e:
+            raise DatabaseError(f"Query execution failed: {e}")
         finally:
-            self.pool = None
-
-    async def _get_connection(self):
-        """Get a connection from the pool (with lazy init and ping)."""
-        if self.pool is None:
-            self.pool = await aiomysql.create_pool(**self._connection_params, minsize=1, maxsize=10)
-        conn = await self.pool.acquire()
-        # Attempt to ping the server; if it fails, reset pool and reconnect
-        try:
-            await conn.ping()
-        except Exception:
-            await self._reset_pool()
-            self.pool = await aiomysql.create_pool(**self._connection_params, minsize=1, maxsize=10)
-            conn = await self.pool.acquire()
-        return conn
-
-    async def _execute_query(self, query: str, params: tuple = None, fetch_one: bool = False, fetch_all: bool = False):
-        """Execute a query and return results (with one reconnect retry on server-lost)."""
-        attempts = 0
-        while True:
-            attempts += 1
-            conn = await self._get_connection()
-            try:
-                async with conn.cursor(aiomysql.DictCursor) as cursor:
-                    await cursor.execute(query, params)
-                    if fetch_one:
-                        return await cursor.fetchone()
-                    elif fetch_all:
-                        return await cursor.fetchall()
-                    else:
-                        return cursor.lastrowid
-            except Exception as e:
-                # Detect MySQL server lost/gone away (2013/2006) and retry once
-                code = getattr(e, 'args', [None])[0]
-                if attempts < 2 and code in (2006, 2013):
-                    await self._reset_pool()
-                    continue
-                raise
-            finally:
-                try:
-                    self.pool.release(conn)
-                except Exception:
-                    pass
+            conn.close()
 
     # --- Image Blob Methods ---
-    async def _ensure_images_table(self):
+    def _ensure_images_table(self):
         """Create images table if it does not exist."""
         create_table_sql = (
             """
@@ -87,21 +61,20 @@ class MySQLRealEstateRepository:
             ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
             """
         )
-        await self._execute_query(create_table_sql)
+        self._execute_query(create_table_sql)
 
-    async def save_image_blob(self, image_id: str, content_type: str, data: bytes) -> None:
-        await self._ensure_images_table()
+    def save_image_blob(self, image_id: str, content_type: str, data: bytes) -> None:
+        self._ensure_images_table()
         insert_sql = "INSERT INTO images (image_id, content_type, data) VALUES (%s, %s, %s)"
-        await self._execute_query(insert_sql, (image_id, content_type, data))
+        self._execute_query(insert_sql, (image_id, content_type, data))
 
-    async def get_image_blob(self, image_id: str) -> Optional[Dict[str, Any]]:
-        await self._ensure_images_table()
+    def get_image_blob(self, image_id: str) -> Optional[Dict[str, Any]]:
+        self._ensure_images_table()
         select_sql = "SELECT content_type, data FROM images WHERE image_id = %s"
-        result = await self._execute_query(select_sql, (image_id,), fetch_one=True)
-        return result
+        return self._execute_query(select_sql, (image_id,), fetch_one=True)
 
     # --- User Methods ---
-    async def get_user_by_telegram_id(self, telegram_id: int) -> Optional[User]:
+    def get_user_by_telegram_id(self, telegram_id: int) -> Optional[User]:
         try:
             query = """
                 SELECT u.*, GROUP_CONCAT(ur.role) as roles
@@ -110,17 +83,16 @@ class MySQLRealEstateRepository:
                 WHERE u.telegram_id = %s
                 GROUP BY u.uid
             """
-            result = await self._execute_query(query, (telegram_id,), fetch_one=True)
+            result = self._execute_query(query, (telegram_id,), fetch_one=True)
             if result:
-                # Convert roles string to list
-                roles = result['roles'].split(',') if result['roles'] else []
+                roles = result['roles'].split(',') if result.get('roles') else []
                 result['roles'] = [UserRole(role) for role in roles if role]
                 return User(**result)
             return None
         except Exception as e:
             raise DatabaseError(f"MySQL error while getting user by telegram_id: {e}")
 
-    async def get_user_by_id(self, uid: str) -> User:
+    def get_user_by_id(self, uid: str) -> User:
         try:
             query = """
                 SELECT u.*, GROUP_CONCAT(ur.role) as roles
@@ -129,12 +101,11 @@ class MySQLRealEstateRepository:
                 WHERE u.uid = %s
                 GROUP BY u.uid
             """
-            result = await self._execute_query(query, (uid,), fetch_one=True)
+            result = self._execute_query(query, (uid,), fetch_one=True)
             if not result:
                 raise UserNotFoundError(identifier=uid)
             
-            # Convert roles string to list
-            roles = result['roles'].split(',') if result['roles'] else []
+            roles = result['roles'].split(',') if result.get('roles') else []
             result['roles'] = [UserRole(role) for role in roles if role]
             return User(**result)
         except UserNotFoundError:
@@ -142,7 +113,7 @@ class MySQLRealEstateRepository:
         except Exception as e:
             raise DatabaseError(f"MySQL error while getting user by ID: {e}")
 
-    async def get_user_by_phone_number(self, phone_number: str) -> Optional[User]:
+    def get_user_by_phone_number(self, phone_number: str) -> Optional[User]:
         try:
             query = """
                 SELECT u.*, GROUP_CONCAT(ur.role) as roles
@@ -151,22 +122,20 @@ class MySQLRealEstateRepository:
                 WHERE u.phone_number = %s
                 GROUP BY u.uid
             """
-            result = await self._execute_query(query, (phone_number,), fetch_one=True)
+            result = self._execute_query(query, (phone_number,), fetch_one=True)
             if result:
-                # Convert roles string to list
-                roles = result['roles'].split(',') if result['roles'] else []
+                roles = result['roles'].split(',') if result.get('roles') else []
                 result['roles'] = [UserRole(role) for role in roles if role]
                 return User(**result)
             return None
         except Exception as e:
             raise DatabaseError(f"MySQL error while getting user by phone: {e}")
 
-    async def create_user(self, user_data: UserCreate) -> User:
+    def create_user(self, user_data: UserCreate) -> User:
         try:
             uid = str(uuid.uuid4())
             now = datetime.now(timezone.utc)
             
-            # Prepare user data
             user_dict = {
                 "uid": uid,
                 "phone_number": user_data.phone_number,
@@ -179,55 +148,48 @@ class MySQLRealEstateRepository:
                 "updated_at": now
             }
             
-            # Insert user
             user_query = """
                 INSERT INTO users (uid, phone_number, telegram_id, display_name, language, hashed_password, active, created_at, updated_at)
                 VALUES (%(uid)s, %(phone_number)s, %(telegram_id)s, %(display_name)s, %(language)s, %(hashed_password)s, %(active)s, %(created_at)s, %(updated_at)s)
             """
-            await self._execute_query(user_query, user_dict)
+            self._execute_query(user_query, user_dict)
             
-            # Insert roles
             if user_data.roles:
                 for role in user_data.roles:
                     role_query = "INSERT INTO user_roles (user_id, role) VALUES (%s, %s)"
-                    await self._execute_query(role_query, (uid, role.value))
+                    self._execute_query(role_query, (uid, role.value))
             
-            return await self.get_user_by_id(uid)
+            return self.get_user_by_id(uid)
         except Exception as e:
             raise DatabaseError(f"MySQL error while creating user: {e}")
 
-    async def update_user(self, uid: str, updates: Dict[str, Any]) -> User:
+    def update_user(self, uid: str, updates: Dict[str, Any]) -> User:
         try:
-            # Build dynamic update query
             set_clauses = []
             params = []
             
             for key, value in updates.items():
-                if key != 'roles':  # Handle roles separately
+                if key != 'roles':
                     set_clauses.append(f"{key} = %s")
                     params.append(value)
             
             if set_clauses:
-                # Order of params must match placeholders: SET ..., updated_at = %s WHERE uid = %s
                 params.append(datetime.now(timezone.utc))
                 params.append(uid)
                 query = f"UPDATE users SET {', '.join(set_clauses)}, updated_at = %s WHERE uid = %s"
-                await self._execute_query(query, tuple(params))
+                self._execute_query(query, tuple(params))
             
-            # Handle roles update
             if 'roles' in updates:
-                # Delete existing roles
-                await self._execute_query("DELETE FROM user_roles WHERE user_id = %s", (uid,))
-                # Insert new roles
+                self._execute_query("DELETE FROM user_roles WHERE user_id = %s", (uid,))
                 for role in updates['roles']:
                     role_query = "INSERT INTO user_roles (user_id, role) VALUES (%s, %s)"
-                    await self._execute_query(role_query, (uid, role.value if hasattr(role, 'value') else role))
+                    self._execute_query(role_query, (uid, role.value if hasattr(role, 'value') else role))
             
-            return await self.get_user_by_id(uid)
+            return self.get_user_by_id(uid)
         except Exception as e:
             raise DatabaseError(f"MySQL error while updating user: {e}")
 
-    async def find_admin_user(self) -> Optional[User]:
+    def find_admin_user(self) -> Optional[User]:
         try:
             query = """
                 SELECT u.*, GROUP_CONCAT(ur.role) as roles
@@ -237,17 +199,16 @@ class MySQLRealEstateRepository:
                 GROUP BY u.uid
                 LIMIT 1
             """
-            result = await self._execute_query(query, fetch_one=True)
+            result = self._execute_query(query, fetch_one=True)
             if result:
-                # Convert roles string to list
-                roles = result['roles'].split(',') if result['roles'] else []
+                roles = result['roles'].split(',') if result.get('roles') else []
                 result['roles'] = [UserRole(role) for role in roles if role]
                 return User(**result)
             return None
         except Exception as e:
             raise DatabaseError(f"MySQL error while finding admin user: {e}")
 
-    async def find_unclaimed_admin(self) -> Optional[User]:
+    def find_unclaimed_admin(self) -> Optional[User]:
         try:
             query = """
                 SELECT u.*, GROUP_CONCAT(ur.role) as roles
@@ -257,17 +218,16 @@ class MySQLRealEstateRepository:
                 GROUP BY u.uid
                 LIMIT 1
             """
-            result = await self._execute_query(query, fetch_one=True)
+            result = self._execute_query(query, fetch_one=True)
             if result:
-                # Convert roles string to list
-                roles = result['roles'].split(',') if result['roles'] else []
+                roles = result['roles'].split(',') if result.get('roles') else []
                 result['roles'] = [UserRole(role) for role in roles if role]
                 return User(**result)
             return None
         except Exception as e:
             raise DatabaseError(f"MySQL error while finding unclaimed admin: {e}")
 
-    async def list_users(self) -> List[User]:
+    def list_users(self) -> List[User]:
         try:
             query = """
                 SELECT u.*, GROUP_CONCAT(ur.role) as roles
@@ -275,42 +235,40 @@ class MySQLRealEstateRepository:
                 LEFT JOIN user_roles ur ON u.uid = ur.user_id
                 GROUP BY u.uid
             """
-            results = await self._execute_query(query, fetch_all=True)
+            results = self._execute_query(query, fetch_all=True)
             users = []
             for result in results:
-                # Convert roles string to list
-                roles = result['roles'].split(',') if result['roles'] else []
+                roles = result['roles'].split(',') if result.get('roles') else []
                 result['roles'] = [UserRole(role) for role in roles if role]
                 users.append(User(**result))
             return users
         except Exception as e:
             raise DatabaseError(f"MySQL error while listing users: {e}")
 
-    async def set_user_role(self, uid: str, role: UserRole, enable: bool) -> User:
-        user = await self.get_user_by_id(uid)
+    def set_user_role(self, uid: str, role: UserRole, enable: bool) -> User:
+        user = self.get_user_by_id(uid)
         roles = set(user.roles or [])
         if enable:
             roles.add(role)
         else:
             roles.discard(role)
-        return await self.update_user(uid, {"roles": list(roles)})
+        return self.update_user(uid, {"roles": list(roles)})
 
-    async def set_user_active(self, uid: str, active: bool) -> User:
-        return await self.update_user(uid, {"active": active})
+    def set_user_active(self, uid: str, active: bool) -> User:
+        return self.update_user(uid, {"active": active})
 
-    async def delete_user(self, uid: str) -> None:
+    def delete_user(self, uid: str) -> None:
         try:
-            await self._execute_query("DELETE FROM users WHERE uid = %s", (uid,))
+            self._execute_query("DELETE FROM users WHERE uid = %s", (uid,))
         except Exception as e:
             raise DatabaseError(f"MySQL error while deleting user: {e}")
 
     # --- Property Methods ---
-    async def create_property(self, property_data: PropertyCreate) -> Property:
+    def create_property(self, property_data: PropertyCreate) -> Property:
         try:
             pid = str(uuid.uuid4())
             now = datetime.now(timezone.utc)
             
-            # Prepare property data
             prop_dict = {
                 "pid": pid,
                 "property_type": property_data.property_type.value,
@@ -348,7 +306,6 @@ class MySQLRealEstateRepository:
                 "updated_at": now
             }
             
-            # Insert property
             prop_query = """
                 INSERT INTO properties (
                     pid, property_type, location_region, location_city, location_site,
@@ -370,31 +327,27 @@ class MySQLRealEstateRepository:
                     %(broker_name)s, %(broker_phone)s, %(status)s, %(created_at)s, %(updated_at)s
                 )
             """
-            await self._execute_query(prop_query, prop_dict)
+            self._execute_query(prop_query, prop_dict)
             
-            # Insert images
             for i, image_url in enumerate(property_data.image_urls):
                 img_query = "INSERT INTO property_images (property_id, image_url, image_order) VALUES (%s, %s, %s)"
-                await self._execute_query(img_query, (pid, image_url, i))
+                self._execute_query(img_query, (pid, image_url, i))
             
-            return await self.get_property_by_id(pid)
+            return self.get_property_by_id(pid)
         except Exception as e:
             raise DatabaseError(f"MySQL error while creating property: {e}")
 
-    async def get_property_by_id(self, pid: str) -> Property:
+    def get_property_by_id(self, pid: str) -> Property:
         try:
-            # Get property
             prop_query = "SELECT * FROM properties WHERE pid = %s"
-            prop_result = await self._execute_query(prop_query, (pid,), fetch_one=True)
+            prop_result = self._execute_query(prop_query, (pid,), fetch_one=True)
             if not prop_result:
                 raise PropertyNotFoundError(identifier=pid)
             
-            # Get images
             img_query = "SELECT image_url FROM property_images WHERE property_id = %s ORDER BY image_order"
-            img_results = await self._execute_query(img_query, (pid,), fetch_all=True)
+            img_results = self._execute_query(img_query, (pid,), fetch_all=True)
             image_urls = [img['image_url'] for img in img_results]
             
-            # Convert to Property model
             prop_dict = dict(prop_result)
             prop_dict['image_urls'] = image_urls
             prop_dict['location'] = {
@@ -409,9 +362,8 @@ class MySQLRealEstateRepository:
         except Exception as e:
             raise DatabaseError(f"MySQL error while getting property by ID: {e}")
 
-    async def update_property(self, pid: str, updates: Dict[str, Any]) -> Property:
+    def update_property(self, pid: str, updates: Dict[str, Any]) -> Property:
         try:
-            # Build dynamic update query
             set_clauses = []
             params = []
             
@@ -420,17 +372,16 @@ class MySQLRealEstateRepository:
                 params.append(value)
             
             if set_clauses:
-                # Order of params must match placeholders: SET ..., updated_at = %s WHERE pid = %s
                 params.append(datetime.now(timezone.utc))
                 params.append(pid)
                 query = f"UPDATE properties SET {', '.join(set_clauses)}, updated_at = %s WHERE pid = %s"
-                await self._execute_query(query, tuple(params))
+                self._execute_query(query, tuple(params))
             
-            return await self.get_property_by_id(pid)
+            return self.get_property_by_id(pid)
         except Exception as e:
             raise DatabaseError(f"MySQL error while updating property: {e}")
 
-    async def get_properties_by_status(self, status: PropertyStatus) -> List[Property]:
+    def get_properties_by_status(self, status: PropertyStatus) -> List[Property]:
         try:
             query = """
                 SELECT p.*, GROUP_CONCAT(pi.image_url ORDER BY pi.image_order) as image_urls
@@ -439,12 +390,11 @@ class MySQLRealEstateRepository:
                 WHERE p.status = %s
                 GROUP BY p.pid
             """
-            results = await self._execute_query(query, (status.value,), fetch_all=True)
+            results = self._execute_query(query, (status.value,), fetch_all=True)
             properties = []
             for result in results:
-                # Convert to Property model
                 prop_dict = dict(result)
-                prop_dict['image_urls'] = result['image_urls'].split(',') if result['image_urls'] else []
+                prop_dict['image_urls'] = result['image_urls'].split(',') if result.get('image_urls') else []
                 prop_dict['location'] = {
                     'region': prop_dict['location_region'],
                     'city': prop_dict['location_city'],
@@ -455,7 +405,7 @@ class MySQLRealEstateRepository:
         except Exception as e:
             raise DatabaseError(f"MySQL error while getting properties by status: {e}")
 
-    async def get_properties_by_broker_id(self, broker_id: str) -> List[Property]:
+    def get_properties_by_broker_id(self, broker_id: str) -> List[Property]:
         try:
             query = """
                 SELECT p.*, GROUP_CONCAT(pi.image_url ORDER BY pi.image_order) as image_urls
@@ -464,12 +414,11 @@ class MySQLRealEstateRepository:
                 WHERE p.broker_id = %s
                 GROUP BY p.pid
             """
-            results = await self._execute_query(query, (broker_id,), fetch_all=True)
+            results = self._execute_query(query, (broker_id,), fetch_all=True)
             properties = []
             for result in results:
-                # Convert to Property model
                 prop_dict = dict(result)
-                prop_dict['image_urls'] = result['image_urls'].split(',') if result['image_urls'] else []
+                prop_dict['image_urls'] = result['image_urls'].split(',') if result.get('image_urls') else []
                 prop_dict['location'] = {
                     'region': prop_dict['location_region'],
                     'city': prop_dict['location_city'],
@@ -480,9 +429,8 @@ class MySQLRealEstateRepository:
         except Exception as e:
             raise DatabaseError(f"MySQL error while getting properties by broker ID: {e}")
 
-    async def query_properties(self, filters: PropertyFilter) -> List[Property]:
+    def query_properties(self, filters: PropertyFilter) -> List[Property]:
         try:
-            # Build WHERE clause dynamically
             where_conditions = ["p.status = %s"]
             params = [filters.status.value if filters.status else PropertyStatus.APPROVED.value]
             
@@ -533,12 +481,11 @@ class MySQLRealEstateRepository:
                 GROUP BY p.pid
             """
             
-            results = await self._execute_query(query, tuple(params), fetch_all=True)
+            results = self._execute_query(query, tuple(params), fetch_all=True)
             properties = []
             for result in results:
-                # Convert to Property model
                 prop_dict = dict(result)
-                prop_dict['image_urls'] = result['image_urls'].split(',') if result['image_urls'] else []
+                prop_dict['image_urls'] = result['image_urls'].split(',') if result.get('image_urls') else []
                 prop_dict['location'] = {
                     'region': prop_dict['location_region'],
                     'city': prop_dict['location_city'],
@@ -546,7 +493,6 @@ class MySQLRealEstateRepository:
                 }
                 properties.append(Property(**prop_dict))
             
-            # Post-query filtering for floor_level (as in original)
             if filters.min_floor_level is not None:
                 properties = [
                     prop for prop in properties 
@@ -557,30 +503,29 @@ class MySQLRealEstateRepository:
         except Exception as e:
             raise DatabaseError(f"MySQL error while querying properties: {e}")
 
-    async def delete_property(self, pid: str) -> None:
+    def delete_property(self, pid: str) -> None:
         try:
-            await self._execute_query("DELETE FROM properties WHERE pid = %s", (pid,))
+            self._execute_query("DELETE FROM properties WHERE pid = %s", (pid,))
         except Exception as e:
             raise DatabaseError(f"MySQL error while deleting property: {e}")
 
-    async def count_properties_by_status(self) -> dict[PropertyStatus, int]:
+    def count_properties_by_status(self) -> dict[PropertyStatus, int]:
         try:
             counts = {}
             for status in PropertyStatus:
                 query = "SELECT COUNT(*) as count FROM properties WHERE status = %s"
-                result = await self._execute_query(query, (status.value,), fetch_one=True)
+                result = self._execute_query(query, (status.value,), fetch_one=True)
                 counts[status] = result['count']
             return counts
         except Exception as e:
             raise DatabaseError(f"MySQL error while counting properties: {e}")
 
     # --- Car Methods ---
-    async def create_car(self, car_data: CarCreate) -> Car:
+    def create_car(self, car_data: CarCreate) -> Car:
         try:
             cid = str(uuid.uuid4())
             now = datetime.now(timezone.utc)
             
-            # Prepare car data
             car_dict = {
                 "cid": cid,
                 "car_type": car_data.car_type.value,
@@ -605,7 +550,6 @@ class MySQLRealEstateRepository:
                 "updated_at": now
             }
             
-            # Insert car
             car_query = """
                 INSERT INTO cars (
                     cid, car_type, price_etb, manufacturer, model_name, model_year,
@@ -619,31 +563,27 @@ class MySQLRealEstateRepository:
                     %(broker_phone)s, %(status)s, %(created_at)s, %(updated_at)s
                 )
             """
-            await self._execute_query(car_query, car_dict)
+            self._execute_query(car_query, car_dict)
             
-            # Insert images
             for i, image_url in enumerate(car_data.images):
                 img_query = "INSERT INTO car_images (car_id, image_url, image_order) VALUES (%s, %s, %s)"
-                await self._execute_query(img_query, (cid, image_url, i))
+                self._execute_query(img_query, (cid, image_url, i))
             
-            return await self.get_car_by_id(cid)
+            return self.get_car_by_id(cid)
         except Exception as e:
             raise DatabaseError(f"MySQL error while creating car: {e}")
 
-    async def get_car_by_id(self, cid: str) -> Car:
+    def get_car_by_id(self, cid: str) -> Car:
         try:
-            # Get car
             car_query = "SELECT * FROM cars WHERE cid = %s"
-            car_result = await self._execute_query(car_query, (cid,), fetch_one=True)
+            car_result = self._execute_query(car_query, (cid,), fetch_one=True)
             if not car_result:
                 raise PropertyNotFoundError(identifier=cid)
             
-            # Get images
             img_query = "SELECT image_url FROM car_images WHERE car_id = %s ORDER BY image_order"
-            img_results = await self._execute_query(img_query, (cid,), fetch_all=True)
+            img_results = self._execute_query(img_query, (cid,), fetch_all=True)
             images = [img['image_url'] for img in img_results]
             
-            # Convert to Car model
             car_dict = dict(car_result)
             car_dict['images'] = images
             
@@ -653,7 +593,7 @@ class MySQLRealEstateRepository:
         except Exception as e:
             raise DatabaseError(f"MySQL error while getting car by ID: {e}")
 
-    async def get_cars_by_broker_id(self, broker_id: str) -> List[Car]:
+    def get_cars_by_broker_id(self, broker_id: str) -> List[Car]:
         try:
             query = """
                 SELECT c.*, GROUP_CONCAT(ci.image_url ORDER BY ci.image_order) as images
@@ -662,20 +602,18 @@ class MySQLRealEstateRepository:
                 WHERE c.broker_id = %s
                 GROUP BY c.cid
             """
-            results = await self._execute_query(query, (broker_id,), fetch_all=True)
+            results = self._execute_query(query, (broker_id,), fetch_all=True)
             cars = []
             for result in results:
-                # Convert to Car model
                 car_dict = dict(result)
-                car_dict['images'] = result['images'].split(',') if result['images'] else []
+                car_dict['images'] = result['images'].split(',') if result.get('images') else []
                 cars.append(Car(**car_dict))
             return cars
         except Exception as e:
             raise DatabaseError(f"MySQL error while getting cars by broker ID: {e}")
 
-    async def query_cars(self, filters: CarFilter) -> List[Car]:
+    def query_cars(self, filters: CarFilter) -> List[Car]:
         try:
-            # Build WHERE clause dynamically
             where_conditions = ["c.status = %s"]
             params = [CarStatus.APPROVED.value]
             
@@ -699,32 +637,31 @@ class MySQLRealEstateRepository:
                 GROUP BY c.cid
             """
             
-            results = await self._execute_query(query, tuple(params), fetch_all=True)
+            results = self._execute_query(query, tuple(params), fetch_all=True)
             cars = []
             for result in results:
-                # Convert to Car model
                 car_dict = dict(result)
-                car_dict['images'] = result['images'].split(',') if result['images'] else []
+                car_dict['images'] = result['images'].split(',') if result.get('images') else []
                 cars.append(Car(**car_dict))
             return cars
         except Exception as e:
             raise DatabaseError(f"MySQL error while querying cars: {e}")
 
-    async def delete_car(self, cid: str) -> None:
+    def delete_car(self, cid: str) -> None:
         try:
-            await self._execute_query("DELETE FROM cars WHERE cid = %s", (cid,))
+            self._execute_query("DELETE FROM cars WHERE cid = %s", (cid,))
         except Exception as e:
             raise DatabaseError(f"MySQL error while deleting car: {e}")
 
-    async def update_car_status(self, cid: str, status: CarStatus) -> Car:
+    def update_car_status(self, cid: str, status: CarStatus) -> Car:
         try:
             query = "UPDATE cars SET status = %s, updated_at = %s WHERE cid = %s"
-            await self._execute_query(query, (status.value, datetime.now(timezone.utc), cid))
-            return await self.get_car_by_id(cid)
+            self._execute_query(query, (status.value, datetime.now(timezone.utc), cid))
+            return self.get_car_by_id(cid)
         except Exception as e:
             raise DatabaseError(f"MySQL error while updating car status: {e}")
 
-    async def list_all_cars(self) -> List[Car]:
+    def list_all_cars(self) -> List[Car]:
         try:
             query = """
                 SELECT c.*, GROUP_CONCAT(ci.image_url ORDER BY ci.image_order) as images
@@ -732,30 +669,27 @@ class MySQLRealEstateRepository:
                 LEFT JOIN car_images ci ON c.cid = ci.car_id
                 GROUP BY c.cid
             """
-            results = await self._execute_query(query, fetch_all=True)
+            results = self._execute_query(query, fetch_all=True)
             cars = []
             for result in results:
-                # Convert to Car model
                 car_dict = dict(result)
-                car_dict['images'] = result['images'].split(',') if result['images'] else []
+                car_dict['images'] = result['images'].split(',') if result.get('images') else []
                 cars.append(Car(**car_dict))
             return cars
         except Exception as e:
             raise DatabaseError(f"MySQL error while listing cars: {e}")
 
-    async def count_cars_by_status(self) -> dict[CarStatus, int]:
+    def count_cars_by_status(self) -> dict[CarStatus, int]:
         try:
             counts = {}
             for status in CarStatus:
                 query = "SELECT COUNT(*) as count FROM cars WHERE status = %s"
-                result = await self._execute_query(query, (status.value,), fetch_one=True)
+                result = self._execute_query(query, (status.value,), fetch_one=True)
                 counts[status] = result['count']
             return counts
         except Exception as e:
             raise DatabaseError(f"MySQL error while counting cars: {e}")
 
-    async def close(self):
-        """Close the connection pool"""
-        if self.pool:
-            self.pool.close()
-            await self.pool.wait_closed()
+    def close(self):
+        """No-op for sync connection if not pooling, or implement if needed."""
+        pass

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Test script to verify MySQL connection and basic functionality
+Test script to verify MySQL connection and basic functionality (Synchronous)
 """
 
-import asyncio
 import os
 import sys
+import time
 from dotenv import load_dotenv
 
 # Add the src directory to the path
@@ -18,9 +18,9 @@ from src.utils.config import settings
 
 load_dotenv()
 
-async def test_mysql_connection():
+def test_mysql_connection():
     """Test MySQL connection and basic operations"""
-    print("Testing MySQL connection...")
+    print("Testing MySQL connection (SYNC)...")
     
     try:
         # Initialize repository
@@ -36,12 +36,12 @@ async def test_mysql_connection():
             roles=[UserRole.BUYER]
         )
         
-        created_user = await repo.create_user(test_user)
+        created_user = repo.create_user(test_user)
         print(f"✓ User created: {created_user.uid}")
         
         # Test 2: Retrieve user
         print("2. Testing user retrieval...")
-        retrieved_user = await repo.get_user_by_id(created_user.uid)
+        retrieved_user = repo.get_user_by_id(created_user.uid)
         print(f"✓ User retrieved: {retrieved_user.display_name}")
         
         # Test 3: Create a test property
@@ -64,26 +64,26 @@ async def test_mysql_connection():
             broker_phone="+251911000000"
         )
         
-        created_property = await repo.create_property(test_property)
+        created_property = repo.create_property(test_property)
         print(f"✓ Property created: {created_property.pid}")
         
         # Test 4: Query properties
         print("4. Testing property query...")
         from src.domain.models.property_models import PropertyFilter
         filter_obj = PropertyFilter()
-        properties = await repo.query_properties(filter_obj)
+        properties = repo.query_properties(filter_obj)
         print(f"✓ Found {len(properties)} properties")
         
         # Test 5: Test user roles
         print("5. Testing user roles...")
-        await repo.set_user_role(created_user.uid, UserRole.BROKER, True)
-        updated_user = await repo.get_user_by_id(created_user.uid)
+        repo.set_user_role(created_user.uid, UserRole.BROKER, True)
+        updated_user = repo.get_user_by_id(created_user.uid)
         print(f"✓ User roles updated: {[role.value for role in updated_user.roles]}")
         
         # Test 6: Clean up test data
         print("6. Cleaning up test data...")
-        await repo.delete_property(created_property.pid)
-        await repo.delete_user(created_user.uid)
+        repo.delete_property(created_property.pid)
+        repo.delete_user(created_user.uid)
         print("✓ Test data cleaned up")
         
         print("\n🎉 All MySQL tests passed! Your database is ready to use.")
@@ -97,8 +97,8 @@ async def test_mysql_connection():
         print("4. Check that the MySQL service is running")
         raise
     finally:
-        if 'repo' in locals() and hasattr(repo, 'close'):
-            await repo.close()
+        # Sync repo doesn't strictly need close() in this simple script context
+        pass
 
 if __name__ == "__main__":
     print("MySQL Connection Test")
@@ -109,4 +109,4 @@ if __name__ == "__main__":
     print(f"MySQL User: {settings.MYSQL_USER}")
     print("=" * 50)
     
-    asyncio.run(test_mysql_connection())
+    test_mysql_connection()

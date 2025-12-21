@@ -23,12 +23,6 @@ user_use_cases = UserUseCases(repo=repo)
 property_use_cases = PropertyUseCases(repo=repo)
 
 
-# --- Dependency Injection Functions for FastAPI ---
-# These functions are used by FastAPI's `Depends` to provide
-# the singleton instances to the API endpoints.
-
-def get_user_use_cases() -> UserUseCases:
-    return user_use_cases
-
-def get_property_use_cases() -> PropertyUseCases:
-    return property_use_cases
+# --- Dependency Injection ---
+# In Flask, we can just import `user_use_cases` and `property_use_cases` directly
+# or use `current_app` context, but simple imports work for this scale.
