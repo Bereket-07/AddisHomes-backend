@@ -1,0 +1,27 @@
+FROM python:3.11-slim
+
+# Install system dependencies (SSH client)
+RUN apt-get update && apt-get install -y openssh-client && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy requirements and install
+COPY requirements.bot.txt .
+RUN pip install --no-cache-dir -r requirements.bot.txt
+
+# Copy source code
+COPY src/ ./src/
+COPY bot_main.py .
+COPY render_init.sh .
+
+# Init script needs to be executable
+RUN chmod +x render_init.sh
+
+# Create SSH directory
+RUN mkdir -p /root/.ssh
+
+# Set environment variables for Render
+ENV PYTHONUNBUFFERED=1
+
+# Use the init script as entrypoint
+CMD ["./render_init.sh"]

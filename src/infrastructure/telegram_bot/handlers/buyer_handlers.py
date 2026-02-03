@@ -52,7 +52,7 @@ async def show_properties(update: Update, context: ContextTypes.DEFAULT_TYPE, fi
     )
     
     prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
-    properties = await prop_cases.find_properties(filters)
+    properties = prop_cases.find_properties(filters)
     
     if not properties:
         await source_message.reply_text(t('no_properties_found', lang=lang, default="No properties found matching your criteria."))

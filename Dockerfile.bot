@@ -1,0 +1,26 @@
+FROM python:3.11-slim
+
+# Install SSH client and other dependencies
+RUN apt-get update && apt-get install -y \
+    openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy requirements
+COPY requirements.bot.txt .
+RUN pip install --no-cache-dir -r requirements.bot.txt
+
+# Copy application code
+COPY src/ ./src/
+COPY bot_main.py .
+COPY .env.bot .env
+
+# Create directory for SSH keys
+RUN mkdir -p /root/.ssh
+
+# Set environment variable to use the .env file
+ENV PYTHONUNBUFFERED=1
+
+# Run the bot
+CMD ["python", "bot_main.py"]

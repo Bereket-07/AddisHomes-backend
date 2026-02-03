@@ -425,7 +425,7 @@ async def receive_description(update: Update, context: ContextTypes.DEFAULT_TYPE
     prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
     try:
         property_to_create = PropertyCreate(broker_id=user.uid, broker_name=user.display_name or "N/A", **context.user_data['submission_data'])
-        await prop_cases.submit_property(property_to_create)
+        prop_cases.submit_property(property_to_create)
         await update.message.reply_text(
             t('submission_complete', lang=user.language),
             reply_markup=keyboards.get_main_menu_keyboard(user)
@@ -445,7 +445,7 @@ async def my_listings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user: User = context.user_data['user']
     prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
     
-    listings = await prop_cases.get_properties_by_broker(user.uid)
+    listings = prop_cases.get_properties_by_broker(user.uid)
     
     if not listings:
         await update.message.reply_text(

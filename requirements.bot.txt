@@ -1,0 +1,12 @@
+# Async dependencies for Telegram bot
+python-telegram-bot
+aiomysql
+python-dotenv
+pydantic
+pydantic-settings
+sshtunnel
+cryptography
+passlib[bcrypt]
+python-jose[cryptography]
+paramiko<3.0.0
+aiohttp

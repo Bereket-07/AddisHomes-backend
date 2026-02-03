@@ -111,9 +111,10 @@ def create_property_card_text(prop: Property, for_admin: bool = False, for_broke
     website_footer = (f"\n\n"
                       f"🌐 For more properties and cars, visit our website: {website_url}")
 
+    details_str = '\n'.join(details_list)
     card_text = (f"{header}\n"
                  f"➖➖➖➖➖➖➖➖➖➖➖➖➖\n"
-                 f"{'\n'.join(details_list)}\n"
+                 f"{details_str}\n"
                  f"{description}"
                  f"{extra_info}"
                  f"{website_footer}")

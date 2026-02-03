@@ -88,7 +88,7 @@ def ensure_user_data(func):
                 logger.warning("Could not find effective_user in update. Cannot refetch user.")
                 return
 
-            user = await user_use_cases.get_or_create_user_by_telegram_id(
+            user = user_use_cases.get_or_create_user_by_telegram_id(
                 telegram_id=effective_user.id,
                 display_name=effective_user.full_name
             )
@@ -143,7 +143,7 @@ async def set_user_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = context.user_data['user']
     user_use_cases: UserUseCases = context.bot_data["user_use_cases"]
 
-    updated_user = await user_use_cases.add_user_role(user.uid, role)
+    updated_user = user_use_cases.add_user_role(user.uid, role)
     context.user_data['user'] = updated_user
 
     await update.message.reply_text(
@@ -220,7 +220,7 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chosen_lang = update.message.text
     lang_code = 'am' if 'አማርኛ' in chosen_lang else 'en'
 
-    updated_user = await user_use_cases.set_user_language(user.uid, lang_code)
+    updated_user = user_use_cases.set_user_language(user.uid, lang_code)
     context.user_data['user'] = updated_user # IMPORTANT: Update context
 
     source_message = update.message or (update.callback_query.message if update.callback_query else None)

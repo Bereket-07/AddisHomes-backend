@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: real-estate-telegram-bot
+    restart: unless-stopped
+    env_file:
+      - .env.bot
+    volumes:
+      # Mount SSH key for cPanel MySQL access (same as your existing setup)
+      - /root/.ssh/cpanel_mysql_key:/root/.ssh/cpanel_mysql_key:ro
+      - .:/app:ro
+    networks:
+      - bot-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  bot-network:
+    driver: bridge

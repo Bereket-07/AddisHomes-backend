@@ -5,6 +5,8 @@ from src.domain.models.car_models import Car, CarCreate, CarFilter, CarStatus
 from src.domain.models.property_models import Property, PropertyCreate, PropertyFilter, PropertyStatus
 from src.utils.exceptions import InvalidOperationError
 
+from src.utils.config import settings
+
 class PropertyUseCases:
     def __init__(self, repo):
         # repo is duck-typed, expected to have sync sync methods now
@@ -12,6 +14,10 @@ class PropertyUseCases:
 
     def submit_property(self, property_data: PropertyCreate) -> Property:
         """Broker submits a new property. It is saved as 'pending'."""
+        # Override broker phone with Admin phone number to prevent bypassing platform
+        if settings.ADMIN_PHONE_NUMBER:
+            property_data.broker_phone = settings.ADMIN_PHONE_NUMBER
+            
         return self.repo.create_property(property_data)
 
     def get_pending_properties(self) -> List[Property]:
@@ -79,6 +85,10 @@ class PropertyUseCases:
 
     # --- Car Use-Cases ---
     def submit_car(self, car_data: CarCreate) -> Car:
+        # Override broker phone with Admin phone number
+        if settings.ADMIN_PHONE_NUMBER:
+            car_data.broker_phone = settings.ADMIN_PHONE_NUMBER
+
         # cars start as pending for admin approval
         if not getattr(car_data, 'status', None):
             car_data.status = CarStatus.PENDING

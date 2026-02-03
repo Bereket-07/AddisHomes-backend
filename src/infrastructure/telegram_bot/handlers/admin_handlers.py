@@ -37,7 +37,7 @@ async def view_pending_listings(update: Update, context: ContextTypes.DEFAULT_TY
     logger.info("Admin requested to view pending listings.")
     
     prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
-    pending_props = await prop_cases.get_pending_properties()
+    pending_props = prop_cases.get_pending_properties()
     
     logger.info(f"Found {len(pending_props)} pending properties in the database.")
 
@@ -56,7 +56,7 @@ async def view_pending_listings(update: Update, context: ContextTypes.DEFAULT_TY
         resolved_urls = [_resolve_image_url(url) for url in prop.image_urls]
         prop_details_card = create_property_card_text(prop, for_admin=True)
         # Append broker contact info (admin-only)
-        broker_user = await user_cases.get_user_by_id(prop.broker_id) if prop.broker_id else None
+        broker_user = user_cases.get_user_by_id(prop.broker_id) if prop.broker_id else None
         contact_lines = "\n\n**Broker Contact:**"
         # Phone preference: property-specific phone if present, else user's phone_number
         phone_val = prop.broker_phone or (getattr(broker_user, 'phone_number', None) or '')
@@ -111,8 +111,8 @@ async def approve_property(update: Update, context: ContextTypes.DEFAULT_TYPE):
     prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
     user_cases: UserUseCases = context.bot_data["user_use_cases"]
 
-    approved_prop = await prop_cases.approve_property(prop_id)
-    broker = await user_cases.get_user_by_id(approved_prop.broker_id)
+    approved_prop = prop_cases.approve_property(prop_id)
+    broker = user_cases.get_user_by_id(approved_prop.broker_id)
     if broker and broker.telegram_id:
         notification_text = t('property_approved_notification', default="Your property submission has been approved and is now live!")
         await context.bot.send_message(chat_id=broker.telegram_id, text=notification_text)
@@ -153,9 +153,9 @@ async def reject_property_reason(update: Update, context: ContextTypes.DEFAULT_T
 
     prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
     user_cases: UserUseCases = context.bot_data["user_use_cases"]
-    rejected_prop = await prop_cases.reject_property(prop_id, reason)
+    rejected_prop = prop_cases.reject_property(prop_id, reason)
 
-    broker = await user_cases.get_user_by_id(rejected_prop.broker_id)
+    broker = user_cases.get_user_by_id(rejected_prop.broker_id)
     if broker and broker.telegram_id:
         notification_text = t('property_rejected_notification', reason=reason, default=f"Your property submission was rejected. Reason: {reason}")
         await context.bot.send_message(chat_id=broker.telegram_id, text=notification_text)
@@ -178,7 +178,7 @@ async def manage_listings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cases: UserUseCases = context.bot_data["user_use_cases"]
     
     # We'll find properties with the 'approved' status
-    approved_props = await prop_cases.find_properties(PropertyFilter(status=PropertyStatus.APPROVED)) # We need to modify find_properties for this
+    approved_props = prop_cases.find_properties(PropertyFilter(status=PropertyStatus.APPROVED)) # We need to modify find_properties for this
     
     if not approved_props:
         await update.message.reply_text(
@@ -193,7 +193,7 @@ async def manage_listings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         resolved_urls = [_resolve_image_url(url) for url in prop.image_urls]
         prop_details_card = create_property_card_text(prop, for_admin=True)
         # Append broker contact info (admin-only)
-        broker_user = await user_cases.get_user_by_id(prop.broker_id) if prop.broker_id else None
+        broker_user = user_cases.get_user_by_id(prop.broker_id) if prop.broker_id else None
         contact_lines = "\n\n**Broker Contact:**"
         phone_val = prop.broker_phone or (getattr(broker_user, 'phone_number', None) or '')
         if phone_val:
@@ -239,7 +239,7 @@ async def mark_as_sold(update: Update, context: ContextTypes.DEFAULT_TYPE):
     prop_id = query.data.split('_')[-1]
 
     prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
-    sold_prop = await prop_cases.mark_property_as_sold(prop_id)
+    sold_prop = prop_cases.mark_property_as_sold(prop_id)
     
     await query.edit_message_text(
         text=f"💰 **ACTION TAKEN: SOLD**\n\nProperty `{sold_prop.pid}` has been marked as sold.",
@@ -271,7 +271,7 @@ async def delete_property_execute(update: Update, context: ContextTypes.DEFAULT_
     prop_id = query.data.split('_')[-1]
 
     prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
-    await prop_cases.delete_property(prop_id)
+    prop_cases.delete_property(prop_id)
     
     await query.edit_message_text(
         text=f"🗑️ **ACTION TAKEN: DELETED**\n\nProperty `{prop_id}` has been permanently deleted.",
@@ -287,7 +287,7 @@ async def delete_property_cancel(update: Update, context: ContextTypes.DEFAULT_T
     user = context.user_data['user']
 
     prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
-    prop = await prop_cases.get_property_details(prop_id)
+    prop = prop_cases.get_property_details(prop_id)
     
     prop_details_card = create_property_card_text(prop, for_admin=True)
     management_keyboard = keyboards.create_admin_management_keyboard(prop.pid, lang=user.language)
@@ -306,7 +306,7 @@ async def view_analytics(update: Update, context: ContextTypes.DEFAULT_TYPE):
     prop_cases: PropertyUseCases = context.bot_data["property_use_cases"]
     user = context.user_data['user']
     
-    analytics_data = await prop_cases.get_analytics_summary()
+    analytics_data = prop_cases.get_analytics_summary()
     
     # Calculate total
     total_properties = sum(analytics_data.values())
