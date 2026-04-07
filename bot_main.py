@@ -103,8 +103,17 @@ async def start_bot_with_tunnel():
             raise
     else:
         logger.info("SSH tunnel disabled. Connecting directly to MySQL...")
-        # Assume environment variables are already set to the direct host
-        # (e.g., MYSQL_HOST=69.72.248.158)
+        
+        # If the user hasn't explicitly set MYSQL_HOST in Render, it defaults to localhost.
+        # We need to point it to the remote server IP instead.
+        direct_host = os.getenv('MYSQL_HOST')
+        if not direct_host or direct_host in ('localhost', '127.0.0.1'):
+            # Fallback to SSH_HOST (which had the server IP), or hardcode the IP
+            direct_host = SSH_HOST if SSH_HOST else '69.72.248.158'
+            
+        logger.info(f"Setting direct MySQL connection host to: {direct_host}")
+        settings.MYSQL_HOST = direct_host
+        os.environ['MYSQL_HOST'] = direct_host
 
     try:
         # Import bot components
