@@ -56,7 +56,7 @@ async def start_bot_with_tunnel():
     await start_background_web_app()
     
     tunnel = None
-    use_ssh = os.getenv('USE_SSH_TUNNEL', 'true').lower() == 'true'
+    use_ssh = os.getenv('USE_SSH_TUNNEL', 'false').lower() == 'true'
     
     if use_ssh:
         # Determine SSH authentication method
