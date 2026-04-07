@@ -21,7 +21,10 @@ class MySQLRealEstateRepository:
             'db': settings.MYSQL_DATABASE,
             'charset': 'utf8mb4',
             'autocommit': True,
-            'cursorclass': pymysql.cursors.DictCursor
+            'cursorclass': pymysql.cursors.DictCursor,
+            'connect_timeout': 30,
+            'read_timeout': 30,
+            'write_timeout': 30
         }
 
     def _get_connection(self):

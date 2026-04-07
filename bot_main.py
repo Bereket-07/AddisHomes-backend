@@ -55,50 +55,59 @@ async def start_bot_with_tunnel():
     # 1. Start the background web server (Keep-alive mechanism)
     await start_background_web_app()
     
-    # Determine SSH authentication method
-    ssh_auth = {}
-    if SSH_KEY_PATH and os.path.exists(SSH_KEY_PATH):
-        # Ensure key has correct permissions (SSH requires 600)
+    tunnel = None
+    use_ssh = os.getenv('USE_SSH_TUNNEL', 'true').lower() == 'true'
+    
+    if use_ssh:
+        # Determine SSH authentication method
+        ssh_auth = {}
+        if SSH_KEY_PATH and os.path.exists(SSH_KEY_PATH):
+            try:
+                os.chmod(SSH_KEY_PATH, 0o600)
+            except:
+                pass
+            ssh_auth['ssh_pkey'] = SSH_KEY_PATH
+            logger.info(f"Using SSH key authentication: {SSH_KEY_PATH}")
+        elif SSH_PASSWORD:
+            ssh_auth['ssh_password'] = SSH_PASSWORD
+            logger.info("Using SSH password authentication")
+        else:
+            raise ValueError("No SSH authentication method provided (SSH_PASSWORD or SSH_KEY_PATH)")
+        
+        # Create SSH tunnel
+        logger.info(f"Creating SSH tunnel to {SSH_HOST}:{SSH_PORT}")
+        logger.info(f"Forwarding {REMOTE_MYSQL_HOST}:{REMOTE_MYSQL_PORT} to localhost:{LOCAL_BIND_PORT}")
+        
+        tunnel = SSHTunnelForwarder(
+            (SSH_HOST, SSH_PORT),
+            ssh_username=SSH_USER,
+            **ssh_auth,
+            remote_bind_address=(REMOTE_MYSQL_HOST, REMOTE_MYSQL_PORT),
+            local_bind_address=('127.0.0.1', LOCAL_BIND_PORT),
+            set_keepalive=30  # Keep connection alive
+        )
+        
         try:
-            os.chmod(SSH_KEY_PATH, 0o600)
-        except:
-            pass
-        ssh_auth['ssh_pkey'] = SSH_KEY_PATH
-        logger.info(f"Using SSH key authentication: {SSH_KEY_PATH}")
-    elif SSH_PASSWORD:
-        ssh_auth['ssh_password'] = SSH_PASSWORD
-        logger.info("Using SSH password authentication")
+            # Start the tunnel
+            tunnel.start()
+            logger.info(f"✅ SSH tunnel established on localhost:{LOCAL_BIND_PORT}")
+            
+            # Update MySQL settings to use tunnel
+            settings.MYSQL_HOST = '127.0.0.1'
+            settings.MYSQL_PORT = LOCAL_BIND_PORT
+            
+            os.environ['MYSQL_HOST'] = '127.0.0.1'
+            os.environ['MYSQL_PORT'] = str(LOCAL_BIND_PORT)
+        except Exception as e:
+            logger.error(f"Failed to start SSH tunnel: {e}")
+            raise
     else:
-        raise ValueError("No SSH authentication method provided (SSH_PASSWORD or SSH_KEY_PATH)")
-    
-    # Create SSH tunnel
-    logger.info(f"Creating SSH tunnel to {SSH_HOST}:{SSH_PORT}")
-    logger.info(f"Forwarding {REMOTE_MYSQL_HOST}:{REMOTE_MYSQL_PORT} to localhost:{LOCAL_BIND_PORT}")
-    
-    tunnel = SSHTunnelForwarder(
-        (SSH_HOST, SSH_PORT),
-        ssh_username=SSH_USER,
-        **ssh_auth,
-        remote_bind_address=(REMOTE_MYSQL_HOST, REMOTE_MYSQL_PORT),
-        local_bind_address=('127.0.0.1', LOCAL_BIND_PORT),
-        set_keepalive=30  # Keep connection alive
-    )
-    
+        logger.info("SSH tunnel disabled. Connecting directly to MySQL...")
+        # Assume environment variables are already set to the direct host
+        # (e.g., MYSQL_HOST=69.72.248.158)
+
     try:
-        # Start the tunnel
-        tunnel.start()
-        logger.info(f"✅ SSH tunnel established on localhost:{LOCAL_BIND_PORT}")
-        
-        # Update MySQL settings to use tunnel
-        # We need to update the settings object directly because it was already initialized
-        settings.MYSQL_HOST = '127.0.0.1'
-        settings.MYSQL_PORT = LOCAL_BIND_PORT
-        
-        # Also update os.environ just in case new instances are created
-        os.environ['MYSQL_HOST'] = '127.0.0.1'
-        os.environ['MYSQL_PORT'] = str(LOCAL_BIND_PORT)
-        
-        # Import bot components (after tunnel is ready)
+        # Import bot components
         from src.infrastructure.telegram_bot.bot import setup_bot_application
         from src.use_cases.user_use_cases import UserUseCases
         from src.use_cases.property_use_cases import PropertyUseCases
@@ -145,9 +154,11 @@ async def start_bot_with_tunnel():
         except:
             pass
         
-        logger.info("Closing SSH tunnel...")
-        tunnel.stop()
+        if tunnel:
+            logger.info("Closing SSH tunnel...")
+            tunnel.stop()
         logger.info("Bot stopped")
+
 
 
 if __name__ == "__main__":
