@@ -56,7 +56,7 @@ async def start_bot_with_tunnel():
     await start_background_web_app()
     
     tunnel = None
-    use_ssh = os.getenv('USE_SSH_TUNNEL', 'false').lower() == 'true'
+    use_ssh = os.getenv('USE_SSH_TUNNEL', 'true').lower() == 'true'
     
     if use_ssh:
         # Determine SSH authentication method
@@ -91,6 +91,24 @@ async def start_bot_with_tunnel():
             # Start the tunnel
             tunnel.start()
             logger.info(f"✅ SSH tunnel established on localhost:{LOCAL_BIND_PORT}")
+            
+            # Start keep-alive task to handle drops
+            async def keep_tunnel_alive():
+                while True:
+                    await asyncio.sleep(45)
+                    if tunnel:
+                        try:
+                            tunnel.check_tunnels()
+                            if not tunnel.is_active:
+                                logger.warning("SSH tunnel dropped. Attempting to restart...")
+                                await asyncio.to_thread(tunnel.stop)
+                                await asyncio.to_thread(tunnel.start)
+                                logger.info("SSH tunnel restarted successfully.")
+                        except Exception as e:
+                            logger.error(f"Error in tunnel keep-alive loop: {e}")
+            
+            import asyncio
+            asyncio.create_task(keep_tunnel_alive())
             
             # Update MySQL settings to use tunnel
             settings.MYSQL_HOST = '127.0.0.1'
