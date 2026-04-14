@@ -48,7 +48,7 @@ class UserUseCases:
 
         # 3. If it's not the admin, create a new regular user
         new_user_data = UserCreate(
-            phone_number="N/A",
+            phone_number=f"N/A_{telegram_id}",
             telegram_id=telegram_id,
             display_name=display_name,
             roles=[]  # New users start with no roles, they select one
